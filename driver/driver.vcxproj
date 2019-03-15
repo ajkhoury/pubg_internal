@@ -1,0 +1,168 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{850E3104-6DE2-4FA3-8E53-4CA21A230429}</ProjectGuid>
+    <RootNamespace>$(MSBuildProjectName)</RootNamespace>
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <Platform Condition="'$(Platform)' == ''">Win32</Platform>
+    <SampleGuid>{9E9E0074-EA13-48A7-AFEE-B64F91E6C4CD}</SampleGuid>
+    <ProjectName>driver</ProjectName>
+    <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetVersion>Windows7</TargetVersion>
+    <UseDebugLibraries>False</UseDebugLibraries>
+    <DriverType>WDM</DriverType>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <SpectreMitigation>false</SpectreMitigation>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetVersion>Windows7</TargetVersion>
+    <UseDebugLibraries>True</UseDebugLibraries>
+    <DriverType>WDM</DriverType>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <SpectreMitigation>false</SpectreMitigation>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <OutDir>$(SolutionDir)build\$(Platform)\$(ConfigurationName)\</OutDir>
+  </PropertyGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ItemGroup Label="WrappedTaskItems">
+    <Inf Include="driver.inf" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetName>nvdid</TargetName>
+    <IntDir>$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetName>nvdid</TargetName>
+    <IntDir>$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WarningLevel>Level4</WarningLevel>
+      <ExceptionHandling>false</ExceptionHandling>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <ControlFlowGuard>false</ControlFlowGuard>
+      <PreprocessorDefinitions>ENABLE_VMP;ENABLE_LOG_FILE;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+    </ClCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </Midl>
+    <Link>
+      <AdditionalDependencies>VMProtectDDK64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>%(AdditionalOptions)  /INTEGRITYCHECK</AdditionalOptions>
+      <AdditionalLibraryDirectories>$(SolutionDir)vendor\vmp;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>"C:\Program Files\VMProtect Professional\VMProtect_Con.exe" "$(OutDir)$(ProjectName)\$(TargetName)$(TargetExt)" -pf "$(SolutionDir)vendor\vmp\driver.vmp"
+call "F:\Code\codesign.bat" "$(OutDir)$(ProjectName)\$(TargetName)_protected$(TargetExt)"
+copy /Y "$(OutDir)$(ProjectName)\$(TargetName)_protected$(TargetExt)" "$(windir)\Sysnative\drivers\$(TargetName)$(TargetExt)"</Command>
+      <Message>"C:\Program Files\VMProtect Professional\VMProtect_Con.exe" "$(OutDir)$(ProjectName)\$(TargetName)$(TargetExt)" -pf "$(SolutionDir)vendor\vmp\driver.vmp"  call "F:\Code\codesign.bat" "$(OutDir)$(ProjectName)\$(TargetName)_protected$(TargetExt)"  copy /Y "$(OutDir)$(ProjectName)\$(TargetName)_protected$(TargetExt)" "$(windir)\Sysnative\drivers\$(TargetName)$(TargetExt)"</Message>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <WarningLevel>Level4</WarningLevel>
+      <ExceptionHandling>false</ExceptionHandling>
+      <SupportJustMyCode>false</SupportJustMyCode>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>ENABLE_EXTENDED_LOGGING;ENABLE_LOG_FILE;ENABLE_LOG;_WIN64;_AMD64_;AMD64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <IntrinsicFunctions>false</IntrinsicFunctions>
+      <ControlFlowGuard>false</ControlFlowGuard>
+    </ClCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </Midl>
+    <Link>
+      <AdditionalOptions>%(AdditionalOptions)  /INTEGRITYCHECK</AdditionalOptions>
+      <AdditionalLibraryDirectories>$(SolutionDir)vendor\vmp;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>VMProtectDDK64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>xcopy /Y "$(OutDir)$(ProjectName)\$(TargetName)$(TargetExt)" "$(windir)\Sysnative\drivers\"</Command>
+      <Message>xcopy /Y "$(OutDir)$(ProjectName)\$(TargetName)$(TargetExt)" "$(windir)\Sysnative\drivers\"</Message>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <None Exclude="@(None)" Include="*.txt;*.htm;*.html" />
+    <None Exclude="@(None)" Include="*.ico;*.cur;*.bmp;*.dlg;*.rct;*.gif;*.jpg;*.jpeg;*.wav;*.jpe;*.tiff;*.tif;*.png;*.rc2" />
+    <None Exclude="@(None)" Include="*.def;*.bat;*.hpj;*.asmx" />
+  </ItemGroup>
+  <ItemGroup>
+    <FilesToPackage Include="$(OutDir)$(TargetName).pdb">
+      <PackageRelativeDirectory>
+      </PackageRelativeDirectory>
+    </FilesToPackage>
+    <FilesToPackage Include="$(OutDir)$(TargetName)$(TargetExt)">
+      <PackageRelativeDirectory>
+      </PackageRelativeDirectory>
+    </FilesToPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="apiset.c" />
+    <ClCompile Include="codegen.c" />
+    <ClCompile Include="crypto.c" />
+    <ClCompile Include="driver.c" />
+    <ClCompile Include="file.c" />
+    <ClCompile Include="image.c" />
+    <ClCompile Include="dispatch.c" />
+    <ClCompile Include="inject.c" />
+    <ClCompile Include="loader.c" />
+    <ClCompile Include="log.c" />
+    <ClCompile Include="mm.c" />
+    <ClCompile Include="process.c" />
+    <ClCompile Include="util.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="apiset.h" />
+    <ClInclude Include="codegen.h" />
+    <ClInclude Include="crypto.h" />
+    <ClInclude Include="driver.h" />
+    <ClInclude Include="file.h" />
+    <ClInclude Include="image.h" />
+    <ClInclude Include="dispatch.h" />
+    <ClInclude Include="inject.h" />
+    <ClInclude Include="loader.h" />
+    <ClInclude Include="log.h" />
+    <ClInclude Include="mm.h" />
+    <ClInclude Include="ntapi.h" />
+    <ClInclude Include="ntbuild.h" />
+    <ClInclude Include="nttrust.h" />
+    <ClInclude Include="pebteb.h" />
+    <ClInclude Include="process.h" />
+    <ClInclude Include="shared.h" />
+    <ClInclude Include="util.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

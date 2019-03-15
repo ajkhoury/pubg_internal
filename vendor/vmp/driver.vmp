@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Document Version="2">
+    <Protection InputFileName="F:\Projects\nvdid\build\x64\Release\driver\nvdid.sys" Options="854984" VMCodeSectionName=".CODE" OutputFileName="F:\Projects\nvdid\build\x64\Release\driver\nvdid_protected.sys">
+        <Messages>
+            <Message Id="0">A debugger has been found running in your system.</Message>
+            <Message Id="1">Sorry, this application cannot run under a vm.</Message>
+            <Message Id="2">File corrupted!</Message>
+        </Messages>
+        <Folders />
+        <Procedures>
+            <Procedure MapAddress='VMProtectMarker &quot;000&quot;' Options="0" />
+            <Procedure MapAddress='VMProtectMarker &quot;001&quot;' Options="0" />
+            <Procedure MapAddress='VMProtectMarker &quot;002&quot;' Options="0" />
+        </Procedures>
+        <Objects />
+    </Protection>
+    <Script />
+</Document>

@@ -1,0 +1,124 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="native">
+      <UniqueIdentifier>{58ed35d7-feb6-4d14-8467-49958051a960}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="native\private">
+      <UniqueIdentifier>{fe2b12d2-f75e-43a8-b3b9-6ed10bf54429}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="utils">
+      <UniqueIdentifier>{56778bd1-ab94-425b-9b08-00178dea750e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="service">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>service</Filter>
+    </ClCompile>
+    <ClCompile Include="..\native\eresource.c">
+      <Filter>native</Filter>
+    </ClCompile>
+    <ClCompile Include="..\native\ldr.c">
+      <Filter>native</Filter>
+    </ClCompile>
+    <ClCompile Include="..\native\log.c">
+      <Filter>native</Filter>
+    </ClCompile>
+    <ClCompile Include="..\native\rtl.c">
+      <Filter>native</Filter>
+    </ClCompile>
+    <ClCompile Include="..\native\service.c">
+      <Filter>native</Filter>
+    </ClCompile>
+    <ClCompile Include="..\native\wow64.c">
+      <Filter>native</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\native\private\nativecommon.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativeex.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativeexcept.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativeinfo.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativeio.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativeldr.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativemm.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativeob.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativepeb.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativepecoff.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativepool.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativeprefetch.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativeps.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativertl.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativesec.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativestatus.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativeteb.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativeuser.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\private\nativewow64.h">
+      <Filter>native\private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\eresource.h">
+      <Filter>native</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\ldr.h">
+      <Filter>native</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\log.h">
+      <Filter>native</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\native.h">
+      <Filter>native</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\rtl.h">
+      <Filter>native</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\service.h">
+      <Filter>native</Filter>
+    </ClInclude>
+    <ClInclude Include="..\native\wow64.h">
+      <Filter>native</Filter>
+    </ClInclude>
+    <ClInclude Include="..\utils\xorstr.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

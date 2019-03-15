@@ -1,0 +1,803 @@
+//
+// PUBG Reversal Notes
+//
+
+**                                 **
+** Finding `GUObjectArray` address **
+**                                 **
+
+    SIG: 48 8D 0D ? ? ? ? E8 ? ? ? ? 90 48 8B 5C 24 ? 48 83 C4 30 (inside UObjectBase::Deconstructor before FUObjectArray::FreeUObjectIndex call)
+    SIG: 48 8D 0D ? ? ? ? E8 ? ? ? ? E8 ? ? ? ? E8 ? ? ? ? 48 89 B5 (inside FEngineLoop::PreInit)
+    SIG: 45 33 C0 48 8D 0D ? ? ? ? E9 ? ? ? ? (inside FUObjectArray::AllocateUObjectIndex)
+
+    Search for the string `TEXT("Unexpected concurency while adding new object")` which is located
+    inside of the `FUObjectArray::FreeUObjectIndex` method. Check the xref which is inside the
+    `UObjectBase::~UObjectBase` deconstructor, and the global variable being passed to 
+    `FUObjectArray::FreeUObjectIndex` is the `GUObjectArray` structure. Here is disassembly of what
+    the `FUObjectArray::FreeUObjectIndex` method looks like:
+
+        __int64 __fastcall FUObjectArray::FreeUObjectIndex(__int64 GObjects, signed __int64 Object)
+        {
+          int Index; // ebx
+          signed __int64 v3; // rbp
+          __int64 gObjects; // rdi
+          __int64 v5; // rcx
+          int v6; // ebx
+          int v7; // esi
+          __int64 v8; // rcx
+          __int64 v9; // r15
+          __int64 result; // rax
+          __int64 i; // rbx
+          ...
+
+          Index = *(_DWORD *)(Object + 0x18);
+          v3 = Object;
+          gObjects = GObjects;
+          tslgame_AK::MemoryMgr::StartProfileThreadUsage();
+          tslgame_AK::MemoryMgr::StartProfileThreadUsage();
+          tslgame_AK::MemoryMgr::StartProfileThreadUsage();
+          v5 = *(_QWORD *)(gObjects + 0x10);
+          v6 = __ROL4__(Index ^ 0x724C63B8, 11);
+          v7 = v6 ^ (v6 << 16) ^ 0x58B86E4B;
+          if ( *(_QWORD *)aXenuinesdkCarv_159 )
+          {
+            LODWORD(v19) = (v5 - 0x5919B186) ^ 0xA6E64E7A;
+            HIDWORD(v19) = (HIDWORD(v5) - 0x5AC65A46) ^ 0x5AC65A46;
+            v8 = v19;
+          }
+          else
+          {
+            v8 = qword_7FF7871C1A28(0x483EDDD1i64, v5);
+          }
+          v9 = 24i64 * v7;
+          if ( !_InterlockedCompareExchange((volatile signed __int64 *)(v9 + v8), 0i64, v3) )
+          {
+            sub_7FF783AC9D90(aDWkTslClientDe_149, 200i64, "Unexpected concurency while adding new object");
+            sub_7FF783ABDEF0((char *)&off_7FF7871BED7E + 1, aDWkTslClientDe_150, 200i64, "Unexpected concurency while adding new object");
+        .....
+
+
+**                                         **
+** Finding global (static) `Names` address **
+**                                         **
+
+    SIG: E8 ? ? ? ? 4C 8B 15 ? ? ? ? 45 33 FF (FName::GetNames call)
+    SIG: E8 ? ? ? ? 84 C0 89 7B 04 (FName::InitInternal_FindOrAddNameEntry call)
+    SIG: 48 8D 4D DF E8 ? ? ? ? 48 8B 08 (call to FName::GetNames)
+
+    Search for the string
+    `TEXT("Hardcoded name '%s' at index %i was duplicated (or unexpected concurrency). Existing entry is '%s'.")`
+    which is located inside the `FName::InitInternal_FindOrAddNameEntry` method that calls the global
+    `FName::GetNames` static method that returns the `Names` address which is of type `TNameEntryArray`.
+    Here is disassembly of what the call to `FName::GetNames` looks like:
+
+        .text:00007FF78511A6FC                          loc_7FF78511A6FC:                   ; CODE XREF: FName__InitInternal_FindOrAddNameEntry_ANSICHAR+19A↑j
+        .text:00007FF78511A6FC                                                              ; FName__InitInternal_FindOrAddNameEntry_ANSICHAR+1AB↑j
+        .text:00007FF78511A6FC 41 0F B7 C5              movzx   eax, r13w
+        .text:00007FF78511A700 48 8D 15 F9 58 52 FD     lea     rdx, __ImageBase
+        .text:00007FF78511A707 48 8D 8A 30 8F FB 05     lea     rcx, [rdx+5FB8F30h]
+        .text:00007FF78511A70E 48 8D 0C C1              lea     rcx, [rcx+rax*8]
+        .text:00007FF78511A712 48 89 4D C7              mov     [rbp+4Fh+OldHashHeadPtr], rcx
+        .text:00007FF78511A716 48 8B 09                 mov     rcx, [rcx]
+        .text:00007FF78511A719 48 89 4D BF              mov     [rbp+4Fh+OldHashHead], rcx
+        .text:00007FF78511A71D 48 8D 04 C5 30 8F 03 06  lea     rax, ds:6038F30h[rax*8]
+        .text:00007FF78511A725 48 03 C2                 add     rax, rdx
+        .text:00007FF78511A728 48 89 45 AF              mov     [rbp+4Fh+NameHashTailPtr], rax
+        .text:00007FF78511A72C 48 8B 00                 mov     rax, [rax]
+        .text:00007FF78511A72F 48 89 45 CF              mov     [rbp+4Fh+OldHashTail], rax
+        .text:00007FF78511A733 48 8D 4D DF              lea     rcx, [rbp+4Fh+var_70]
+        .text:00007FF78511A737 E8 34 63 00 00           call    FName__GetNames
+        .text:00007FF78511A737
+        .text:00007FF78511A73C 48 8B 08                 mov     rcx, [rax]
+        .text:00007FF78511A73F 48 83 3D B9 B5 FD 01 00  cmp     qword ptr cs:aXenuinesdkCarv_160, 0 ; "XENUINESDK_CARVE"
+        .text:00007FF78511A747 75 71                    jnz     short loc_7FF78511A7BA
+        .text:00007FF78511A747
+        .text:00007FF78511A749 48 8B D1                 mov     rdx, rcx                        ; _QWORD
+        .text:00007FF78511A74C B9 69 DD 3E 48           mov     ecx, 483EDD69h                  ; _QWORD
+        .text:00007FF78511A751 FF 15 D1 B5 FD 01        call    cs:Xenuine__Decrypt
+        .text:00007FF78511A751
+        .text:00007FF78511A757 E9 F5 00 00 00           jmp     loc_7FF78511A851
+        .text:00007FF78511A757
+
+        LABEL_25:
+            OldHashHeadPtr = (FNameEntry **)&_ImageBase[8 * ihash + 0x5FB8F30];
+            OldHashHead = *OldHashHeadPtr;
+            OldHashTailPtr = (FNameEntry **)&_ImageBase[8 * ihash + 0x6038F30];
+            NameHashTailPtr = OldHashTailPtr;
+            OldHashTail = *OldHashTailPtr;
+            NamesEncryptedPtr = FName::GetNames((__int64 *)&v55);
+            NamesEncrypted = *NamesEncryptedPtr;
+            if ( *(_QWORD *)aXenuinesdkCarv_160 )
+            {
+              NamesEncryptedHigh = NamesEncrypted >> 32;
+              NamesEncryptedLow = (NamesEncrypted & 0xFFFF0000 | (unsigned __int16)__ROR2__(
+                                                                                     NamesEncrypted ^ WORD1(NamesEncrypted),
+                                                                                     8))
+                                - 0x5111C90E;
+              LODWORD(DecryptedNames) = ((unsigned __int16)__ROR2__(NamesEncryptedLow ^ HIWORD(NamesEncryptedLow), 8) | ((unsigned __int16)__ROR2__(HIWORD(NamesEncryptedLow), 8) << 16)) ^ 0xAEEE36F2;
+              LOWORD(NamesEncryptedLow) = __ROR2__(HIWORD(NamesEncrypted), 8);
+              HIDWORD(DecryptedNames) = ((unsigned __int16)(((WORD1(NamesEncryptedHigh) ^ WORD2(NamesEncrypted)) - 0x52CE) ^ ((unsigned int)(((unsigned __int16)(WORD1(NamesEncryptedHigh) ^ WORD2(NamesEncrypted)) | ((unsigned __int16)NamesEncryptedLow << 16)) - 0x524E52CE) >> 16)) | (((unsigned __int16)(WORD1(NamesEncryptedHigh) ^ WORD2(NamesEncrypted)) | ((unsigned __int16)NamesEncryptedLow << 16)) - 0x524E52CE) & 0xFFFF0000) ^ 0x524E52CE;
+              GNames = DecryptedNames;
+            }
+            else
+            {
+              GNames = (TNameEntryArray *)Xenuine::Decrypt(0x483EDD69i64, *NamesEncryptedPtr);
+            }
+            Names = GNames;
+            newIndex = *outIndex;
+            if ( *outIndex < 0 )
+            {
+              newIndex = TNameEntryArray::AddZeroed(GNames, 1);
+              *outIndex = newIndex;
+            }
+
+
+**                                  **
+** Finding global `GEngine` address **
+**                                  **
+
+    SIG: 49 8B 97 ? ? ? ? 48 8B 0D ? ? ? ? E8 ? ? ? ? 90 (right by call to UEngine::BroadcastTravelFailure)
+    SIG: E8 ? ? ? ? 48 8B 93 ? ? ? ? 33 F6 48 8B 0D (FSeamlessTravelHandler::Tick call inside UEngine::TickWorldTravel)
+    SIG: 48 89 05 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B 0D (right after call to NewObject where GEngine is initialized inside FEngineLoop::PreInit)
+
+    Search for the string TEXT("Failed to load Engine class '%s'.") which is where the GEngine object
+    is created with the NewObject subroutine. Looks like this:
+
+        .text:00007FF7F22D7102 39 5D F0             cmp     dword ptr [rbp+650h+var_660], ebx
+        .text:00007FF7F22D7105 4C 0F 45 75 E8       cmovnz  r14, [rbp+650h+var_668]
+        .text:00007FF7F22D710A 4C 89 74 24 20       mov     [rsp+750h+var_730], r14
+        .text:00007FF7F22D710F 4C 8D 0D 1A 8D 86 02 lea     r9, aFailedToLoadEn_0           ; "Failed to load Engine class '%s'."
+        .text:00007FF7F22D7116 41 B8 8C 08 00 00    mov     r8d, 88Ch                       ; Line
+        .text:00007FF7F22D711C 48 8D 15 AD 8D 86 02 lea     rdx, aDWkTslClientDe_957        ; "D:\\wk\\tsl-client-dev3-branch\\build\\"...
+        .text:00007FF7F22D7123 48 8D 0D 30 4F 86 02 lea     rcx, byte_7FF7F4B3C05A          ; Expr
+        .text:00007FF7F22D712A E8 11 6D 85 FF       call    FDebug__AssertFailed
+        .text:00007FF7F22D712F
+        .text:00007FF7F22D712F                      loc_7FF7F22D712F:                       ; CODE XREF: FEngineLoop__PreInit+29ED↑j
+        .text:00007FF7F22D712F 48 89 75 D0          mov     [rbp+650h+var_680], rsi
+        .text:00007FF7F22D7133 E8 C8 D4 41 FE       call    GetTransientPackage
+        .text:00007FF7F22D7133
+        .text:00007FF7F22D7138 48 8B C8             mov     rcx, rax
+        .text:00007FF7F22D713B 48 89 74 24 30       mov     [rsp+750h+var_720], rsi
+        .text:00007FF7F22D7140 C6 44 24 28 00       mov     byte ptr [rsp+750h+var_728], 0
+        .text:00007FF7F22D7145 48 89 74 24 20       mov     [rsp+750h+var_730], rsi
+        .text:00007FF7F22D714A 45 33 C9             xor     r9d, r9d
+        .text:00007FF7F22D714D 4C 8B C6             mov     r8, rsi
+        .text:00007FF7F22D7150 48 8B D3             mov     rdx, rbx
+        .text:00007FF7F22D7153 E8 28 83 FF FF       call    NewObject               
+        .text:00007FF7F22D7153
+        .text:00007FF7F22D7158 48 89 05 E1 97 FE 03 mov     cs:GEngine, rax         ; <------ Sig is found here
+        .text:00007FF7F22D715F 48 8B C8             mov     rcx, rax
+        .text:00007FF7F22D7162 E8 F9 FA 47 00       call    UEngine__ParseCommandline
+        .text:00007FF7F22D7162
+        .text:00007FF7F22D7167 48 8B 0D D2 97 FE 03 mov     rcx, cs:GEngine
+        .text:00007FF7F22D716E 48 8B 01             mov     rax, [rcx]
+
+        EngineClass = StaticLoadClass(v304, 0, (__int64)v303);
+        if ( !EngineClass )
+        {
+          v306 = &word_7FF7F428F304;
+          if ( (_DWORD)v376 )
+            v306 = v375;
+          FMsg::Logf_Internal(aDWkTslClientDe_956, 2188, aFailedToLoadEn, v306);
+          if ( (_DWORD)v376 )
+            v289 = v375;
+          FDebug::AssertFailed(byte_7FF7F4B3C05A, aDWkTslClientDe_957, 2188, aFailedToLoadEn_0, v289);
+        }
+        v372 = 0i64;
+        TransientPackage = GetTransientPackage();
+        v348 = 0i64;
+        GEngine = NewObject(TransientPackage, EngineClass, 0i64, 0, 0i64, 0);
+        UEngine::ParseCommandline(GEngine);
+        (*(void (__fastcall **)(_QWORD, __int64))(*(_QWORD *)GEngine + 0x260i64))(GEngine, GEngineLoop); // GEngine->Init(this);
+
+    Search for the string TEXT("Unable to travel to '%s' - package is not a level") which is
+    located inside the `FSeamlessTravelHandler::Tick` method that calls the `UEngine::BroadcastTravelFailure`
+    method. Here is disassembly of what it looks like:
+
+        .text:00007FF78440398A 90                       nop
+        .text:00007FF78440398B 83 7C 24 78 00           cmp     dword ptr [rsp+1F8h+var_180], 0
+        .text:00007FF784403990 4C 0F 45 64 24 70        cmovnz  r12, [rsp+1F8h+LoadedPackageNameChars]
+        .text:00007FF784403996 4D 8B C4                 mov     r8, r12
+        .text:00007FF784403999 48 8D 15 F0 45 A1 02     lea     rdx, aUnableToTravel            ; "Unable to travel to '%s' - package is n"...
+        .text:00007FF7844039A0 48 8D 8C 24 80 00 00 00  lea     rcx, [rsp+1F8h+Error]
+        .text:00007FF7844039A8 E8 93 29 46 01           call    FString__Printf
+        .text:00007FF7844039A8
+        .text:00007FF7844039AD 90                       nop
+        .text:00007FF7844039AE 48 8B 4C 24 70           mov     rcx, [rsp+1F8h+LoadedPackageNameChars]
+        .text:00007FF7844039B3 48 85 C9                 test    rcx, rcx
+        .text:00007FF7844039B6 74 06                    jz      short loc_7FF7844039BE
+        .text:00007FF7844039B6
+        .text:00007FF7844039B8 E8 23 74 9F FE           call    sub_7FF782DFADE0
+        .text:00007FF7844039B8
+        .text:00007FF7844039BD 90                       nop
+        .text:00007FF7844039BD
+        .text:00007FF7844039BE
+        .text:00007FF7844039BE                          loc_7FF7844039BE:                       ; CODE XREF: FSeamlessTravelHandler__Tick+266↑j
+        .text:00007FF7844039BE 49 8B CF                 mov     rcx, r15
+        .text:00007FF7844039C1 E8 1A AC FE FF           call    FSeamlessTravelHandler__CancelTravel
+        .text:00007FF7844039C1
+        .text:00007FF7844039C6 4C 8D 8C 24 80 00 00 00  lea     r9, [rsp+1F8h+Error]
+        .text:00007FF7844039CE 45 33 C0                 xor     r8d, r8d
+        .text:00007FF7844039D1 49 8B 97 98 00 00 00     mov     rdx, [r15+98h]
+        .text:00007FF7844039D8 48 8B 0D 89 43 16 04     mov     rcx, cs:GEngine
+        .text:00007FF7844039DF E8 5C E7 B6 FF           call    UEngine__BroadcastTravelFailure
+        .text:00007FF7844039DF
+        .text:00007FF7844039E4 90                       nop
+        .text:00007FF7844039E5 48 8B 8C 24 80 00 00 00  mov     rcx, [rsp+1F8h+Error]
+        .text:00007FF7844039ED 48 85 C9                 test    rcx, rcx
+        .text:00007FF7844039F0 74 06                    jz      short loc_7FF7844039F8
+        .text:00007FF7844039F0
+        .text:00007FF7844039F2 E8 E9 73 9F FE           call    sub_7FF782DFADE0
+
+        if ( !PersistentLevel )
+        {
+          LoadedPackage = *(_QWORD *)(thisptr + 0x90);
+          v16 = *(_DWORD *)(LoadedPackage + 0xC);
+          tslgame_AK::MemoryMgr::StartProfileThreadUsage();
+          tslgame_AK::MemoryMgr::StartProfileThreadUsage();
+          tslgame_AK::MemoryMgr::StartProfileThreadUsage();
+          LODWORD(LoadedPackage) = *(_DWORD *)(LoadedPackage + 8);
+          tslgame_AK::MemoryMgr::StartProfileThreadUsage();
+          tslgame_AK::MemoryMgr::StartProfileThreadUsage();
+          tslgame_AK::MemoryMgr::StartProfileThreadUsage();
+          LODWORD(LoadedPackage) = __ROR4__(LoadedPackage ^ 0x1AFC1A38, 14);
+          LODWORD(LoadedPackageNameString) = LoadedPackage ^ ((_DWORD)LoadedPackage << 16) ^ 0xC38F941C;
+          v17 = __ROL4__(v16 ^ 0xA6786278, 10);
+          HIDWORD(LoadedPackageNameString) = v17 ^ (v17 << 16) ^ 0x8FC335B1;
+          sub_7FF785129160(&LoadedPackageNameString, &LoadedPackageNameChars);
+          if ( (_DWORD)v237 )
+            LoadedPackageName = (__int16 *)LoadedPackageNameChars;
+          FString::Printf(&Error, "Unable to travel to '%s' - package is not a level", LoadedPackageName);
+          if ( LoadedPackageNameChars )
+            sub_7FF782DFADE0(LoadedPackageNameChars);
+          FSeamlessTravelHandler::CancelTravel(thisptr);
+          UEngine::BroadcastTravelFailure((__int64)GEngine, *(_QWORD *)(thisptr + 0x98), 0, (__int64)&Error);
+          if ( Error )
+            sub_7FF782DFADE0(Error);
+          return sub_7FF785FB9430((unsigned __int64)&v226 ^ v261);
+        }
+
+
+**                          **
+** Finding `GWorld` address **
+**                          **
+
+    SIG: 48 8B F7 48 8B 0D ? ? ? ? (inside unknown method)
+    SIG: EB 2E 4C 89 44 24 ? (inside UGameEngine::Tick)
+    SIG: 48 89 0D ? ? ? ? 48 85 D2 (inside UEngine::LoadMap)
+    SIG: EB 1A 4C 89 74 24 ? (inside FSeamlessTravelHandler::Tick)
+    SIG: 48 8B 0D ? ? ? ? 48 83 3D ? ? ? ? ? 75 18 (inside FEngineLoop::Tick)
+
+    Search for the string TEXT("causeevent=") which is located inside the `UGameEngine::Tick` method.
+    Alternatively you can search for the string
+    TEXT("Negative delta time! Please see https://udn.epicgames.com/lists/showpost.php?list=ue3bugs&id=4364")
+    which is located inside the same `UGameEngine::Tick` method. There is an identical looking region that 
+    references the `GWorld` pointer inside `UEngine::LoadMap`. In between these two string references
+    are references to the global `GWorld` address. Here is disassembly of what the references look like:
+
+        do
+        {
+          Context = *(FWorldContext **)(WorldOffset + *(_QWORD *)(engine + 0xD08));
+          ThisCurrentWorldEncrypted = Context->ThisCurrentWorld;
+          if ( aXenuinesdkCarv_162[0] )
+          {
+            LODWORD(ThisCurrentWorldDecrypted) = ((_DWORD)ThisCurrentWorldEncrypted - 0x46450EB) ^ 0xFB9BAF15;
+            HIDWORD(ThisCurrentWorldDecrypted) = (HIDWORD(ThisCurrentWorldEncrypted) + 0x7AF47A35) ^ 0x850B85CB;
+            ThisCurrentWorld = ThisCurrentWorldDecrypted;
+          }
+          else
+          {
+            xenuine::decrypt(0x483EDD60i64, Context->ThisCurrentWorld);
+          }
+          if ( ThisCurrentWorld )
+          {
+            thisCurrentWorldEncrypted = Context->ThisCurrentWorld;
+            if ( aXenuinesdkCarv_162[0] )
+            {
+              LODWORD(thisCurrentWorldDecrypted) = ((_DWORD)thisCurrentWorldEncrypted - 0x46450EB) ^ 0xFB9BAF15;
+              HIDWORD(thisCurrentWorldDecrypted) = (HIDWORD(thisCurrentWorldEncrypted) + 0x7AF47A35) ^ 0x850B85CB;
+              thisCurrentWorld = thisCurrentWorldDecrypted;
+            }
+            else
+            {
+              xenuine::decrypt(0x483EDD60i64, Context->ThisCurrentWorld);
+            }
+            if ( *(_BYTE *)(thisCurrentWorld + 0xE0) )
+            {
+              DisCurrentWorldEncrypted = Context->ThisCurrentWorld;
+              if ( aXenuinesdkCarv_162[0] )
+              {
+                LODWORD(DisCurrentWorldDecrypted) = ((_DWORD)DisCurrentWorldEncrypted - 0x46450EB) ^ 0xFB9BAF15;
+                HIDWORD(DisCurrentWorldDecrypted) = (HIDWORD(DisCurrentWorldEncrypted) + 0x7AF47A35) ^ 0x850B85CB;
+                DisCurrentWorld = DisCurrentWorldDecrypted;
+              }
+              else
+              {
+                xenuine::decrypt(0x483EDD60i64, Context->ThisCurrentWorld);
+                DisCurrentWorld = v35;
+              }
+              if ( aXenuinesdkCarv_162[0] )
+              {
+                LODWORD(v131) = (DisCurrentWorld ^ 0x2020A0E0) + 0x301C4A02;
+                HIDWORD(v131) = (HIDWORD(DisCurrentWorld) ^ 0xE020E020) + 0x4F1B3530;
+                Context.World_Encrypted = v131;
+              }
+              else
+              {
+                Context.World_Encrypted = xenuine::Encrypt(0x483EDD5Fi64, DisCurrentWorld, 0i64);
+              }
+              GWorld = Context.World_Encrypted;                             // <-------  GWorld reference
+              if ( !aXenuinesdkCarv_162[0] )
+                xenuine::decrypt(0x483EDD5Fi64, Context.World_Encrypted);
+              (*(void (__fastcall **)(__int64, FWorldContext *, float))(*(_QWORD *)engine + 0x418i64))(engine, Context, DeltaSeconds); // TickWorldTravel
+              if ( !byte_7FF78855B43C )
+              {
+                v38 = Context->ThisCurrentWorld;
+                if ( aXenuinesdkCarv_162[0] )
+                {
+                  LODWORD(v132) = ((_DWORD)v38 - 0x46450EB) ^ 0xFB9BAF15;
+                  HIDWORD(v132) = (HIDWORD(v38) + 0x7AF47A35) ^ 0x850B85CB;
+                  v39 = v132;
+                }
+                else
+                {
+                  xenuine::decrypt(0x483EDD60i64, Context->ThisCurrentWorld);
+                }
+                if ( (unsigned __int8)sub_7FF7843EE0D0(v39) )
+                {
+                  v40 = Context->ThisCurrentWorld;
+                  if ( aXenuinesdkCarv_162[0] )
+                  {
+                    LODWORD(v133) = ((_DWORD)v40 - 0x46450EB) ^ 0xFB9BAF15;
+                    HIDWORD(v133) = (HIDWORD(v40) + 0x7AF47A35) ^ 0x850B85CB;
+                    v41 = v133;
+                  }
+                  else
+                  {
+                    xenuine::decrypt(0x483EDD60i64, Context->ThisCurrentWorld);
+                  }
+                  sub_7FF785146B00(v41);
+                  v42 = Context->ThisCurrentWorld;
+                  if ( aXenuinesdkCarv_162[0] )
+                  {
+                    LODWORD(v134) = ((_DWORD)v42 - 0x46450EB) ^ 0xFB9BAF15;
+                    HIDWORD(v134) = (HIDWORD(v42) + 2062842421) ^ 0x850B85CB;
+                    v43 = v134;
+                  }
+                  else
+                  {
+                    xenuine::decrypt(0x483EDD60i64, Context->ThisCurrentWorld);
+                  }
+                  sub_7FF784D66760(v43);
+                }
+              }
+              if ( !bIsIdleMode )
+              {
+                *(_DWORD *)(engine + 0xCC0) = 0;  // GameCycles=0;
+                v44 = Context->ThisCurrentWorld;
+                if ( aXenuinesdkCarv_162[0] )
+                {
+                  LODWORD(v135) = ((_DWORD)v44 - 0x46450EB) ^ 0xFB9BAF15;
+                  HIDWORD(v135) = (HIDWORD(v44) + 2062842421) ^ 0x850B85CB;
+                  v45 = v135;
+                }
+                else
+                {
+                  xenuine::decrypt(0x483EDD60i64, Context->ThisCurrentWorld);
+                }
+                UWorld::Tick(v45, 2u, DeltaSeconds);
+              }
+              v46 = Context->ThisCurrentWorld;
+              v47 = aXenuinesdkCarv_162[0];
+              if ( aXenuinesdkCarv_162[0] )
+              {
+                LODWORD(v136) = ((_DWORD)v46 - 0x46450EB) ^ 0xFB9BAF15;
+                HIDWORD(v136) = (HIDWORD(v46) + 2062842421) ^ 0x850B85CB;
+                Context_World = v136;
+              }
+              else
+              {
+                xenuine::decrypt(0x483EDD60i64, Context->ThisCurrentWorld);
+                v47 = aXenuinesdkCarv_162[0];
+              }
+              if ( *(_BYTE *)(Context_World + 0x778) & 1 )// if ( Context.World()->bWorldWasLoadedThisTick )
+              {
+                thiscurrentWorldEncrypted = Context->ThisCurrentWorld;
+                if ( v47 )
+                {
+                  LODWORD(thiscurrentWorldDecrypted) = ((_DWORD)thiscurrentWorldEncrypted - 0x46450EB) ^ 0xFB9BAF15;
+                  HIDWORD(thiscurrentWorldDecrypted) = (HIDWORD(thiscurrentWorldEncrypted) + 0x7AF47A35) ^ 0x850B85CB;
+                  Context.World = thiscurrentWorldDecrypted;
+                }
+                else
+                {
+                  xenuine::decrypt(0x483EDD60i64, Context->ThisCurrentWorld);
+                }
+                *(_DWORD *)(Context.World + 0x778) &= 0xFFFFFFFE;// Context.World()->bWorldWasLoadedThisTick = false;
+                InitialExec = FURL::GetOption(&Context->LastURL, "causeevent=", 0i64);              // <--- `causeevent=` string
+                owningGameInstance = (unsigned __int64)Context->OwningGameInstance;
+            .......
+
+            .text:00007FF783E2DCAA                          loc_7FF783E2DCAA:                       ; CODE XREF: UGameEngine__Tick+492↑j
+            .text:00007FF783E2DCAA 4C 89 44 24 58           mov     [rsp+1D8h+DisCurrentWorldDecrypted], r8
+            .text:00007FF783E2DCAF 8D 81 15 AF 9B FB        lea     eax, [rcx-46450EBh]
+            .text:00007FF783E2DCB5 35 15 AF 9B FB           xor     eax, 0FB9BAF15h
+            .text:00007FF783E2DCBA 89 44 24 58              mov     dword ptr [rsp+1D8h+DisCurrentWorldDecrypted], eax
+            .text:00007FF783E2DCBE 48 C1 E9 20              shr     rcx, 20h
+            .text:00007FF783E2DCC2 81 C1 35 7A F4 7A        add     ecx, 7AF47A35h
+            .text:00007FF783E2DCC8 81 F1 CB 85 0B 85        xor     ecx, 850B85CBh
+            .text:00007FF783E2DCCE 89 4C 24 5C              mov     dword ptr [rsp+1D8h+DisCurrentWorldDecrypted+4], ecx
+            .text:00007FF783E2DCD2 48 8B 4C 24 58           mov     rcx, [rsp+1D8h+DisCurrentWorldDecrypted]
+            .text:00007FF783E2DCD2
+            .text:00007FF783E2DCD7
+            .text:00007FF783E2DCD7                          loc_7FF783E2DCD7:                       ; CODE XREF: UGameEngine__Tick+4A8↑j
+            .text:00007FF783E2DCD7 48 83 3D 21 CD E4 02 00  cmp     qword ptr cs:aXenuinesdkCarv_162, 0 ; "XENUINESDK_CARVE"
+            .text:00007FF783E2DCDF 75 10                    jnz     short loc_7FF783E2DCF1
+            .text:00007FF783E2DCDF
+            .text:00007FF783E2DCE1 48 8B D1                 mov     rdx, rcx                        ; _QWORD
+            .text:00007FF783E2DCE4 B9 5F DD 3E 48           mov     ecx, 483EDD5Fh                  ; _QWORD
+            .text:00007FF783E2DCE9 FF 15 31 CD E4 02        call    cs:xenuine__Encrypt
+            .text:00007FF783E2DCE9
+            .text:00007FF783E2DCEF EB 2E                    jmp     short loc_7FF783E2DD1F
+            .text:00007FF783E2DCEF
+            .text:00007FF783E2DCF1                          ; ---------------------------------------------------------------------------
+            .text:00007FF783E2DCF1
+            .text:00007FF783E2DCF1                          loc_7FF783E2DCF1:                       ; CODE XREF: UGameEngine__Tick+4DF↑j
+            .text:00007FF783E2DCF1 4C 89 44 24 60           mov     [rsp+1D8h+var_178], r8
+            .text:00007FF783E2DCF6 8B C1                    mov     eax, ecx
+            .text:00007FF783E2DCF8 35 E0 A0 20 20           xor     eax, 2020A0E0h
+            .text:00007FF783E2DCFD 05 02 4A 1C 30           add     eax, 301C4A02h
+            .text:00007FF783E2DD02 89 44 24 60              mov     dword ptr [rsp+1D8h+var_178], eax
+            .text:00007FF783E2DD06 48 C1 E9 20              shr     rcx, 20h
+            .text:00007FF783E2DD0A 81 F1 20 E0 20 E0        xor     ecx, 0E020E020h
+            .text:00007FF783E2DD10 81 C1 30 35 1B 4F        add     ecx, 4F1B3530h
+            .text:00007FF783E2DD16 89 4C 24 64              mov     dword ptr [rsp+1D8h+var_178+4], ecx
+            .text:00007FF783E2DD1A 48 8B 44 24 60           mov     rax, [rsp+1D8h+var_178]
+            .text:00007FF783E2DD1A
+            .text:00007FF783E2DD1F
+            .text:00007FF783E2DD1F                          loc_7FF783E2DD1F:               ; CODE XREF: UGameEngine__Tick+4EF↑j
+            .text:00007FF783E2DD1F 48 89 05 02 22 78 04     mov     cs:GWorld, rax                                          ; <------------ THIS IS `GWorld` REFERNECE 
+            .text:00007FF783E2DD26 48 83 3D D2 CC E4 02 00  cmp     qword ptr cs:aXenuinesdkCarv_162, 0 ; "XENUINESDK_CARVE"
+            .text:00007FF783E2DD2E 75 0E                    jnz     short loc_7FF783E2DD3E
+            .text:00007FF783E2DD2E
+            .text:00007FF783E2DD30 48 8B D0                 mov     rdx, rax                        ; _QWORD
+            .text:00007FF783E2DD33 B9 5F DD 3E 48           mov     ecx, 483EDD5Fh                  ; _QWORD
+            .text:00007FF783E2DD38 FF 15 EA CC E4 02        call    cs:xenuine__decrypt
+            .text:00007FF783E2DD38
+            .text:00007FF783E2DD3E
+            .text:00007FF783E2DD3E                          loc_7FF783E2DD3E:                       ; CODE XREF: UGameEngine__Tick+52E↑j
+            .text:00007FF783E2DD3E 49 8B 04 24              mov     rax, [r12]
+            .text:00007FF783E2DD42 0F 28 D7                 movaps  xmm2, xmm7
+            .text:00007FF783E2DD45 49 8B D5                 mov     rdx, r13
+            .text:00007FF783E2DD48 49 8B CC                 mov     rcx, r12
+            .text:00007FF783E2DD4B FF 90 18 04 00 00        call    qword ptr [rax+418h]
+            .text:00007FF783E2DD4B
+            .text:00007FF783E2DD51 80 3D E4 D6 72 04 00     cmp     cs:byte_7FF78855B43C, 0
+            .text:00007FF783E2DD58 0F 85 16 01 00 00        jnz     loc_7FF783E2DE74
+            .text:00007FF783E2DD58
+            .text:00007FF783E2DD5E 49 8B 8D A0 02 00 00     mov     rcx, [r13+2A0h]
+            .text:00007FF783E2DD65 48 83 3D 93 CC E4 02 00  cmp     qword ptr cs:aXenuinesdkCarv_162, 0 ; "XENUINESDK_CARVE"
+            .text:00007FF783E2DD6D 75 10                    jnz     short loc_7FF783E2DD7F
+
+    Another place more preferable for ease of finding `GWorld` is around the reference to the string
+    `TEXT("Process CMD: %s")`, though this string is not resident in the public UE4 SDK. Here is the
+    disassembly of the `GWorld` reference around the `TEXT("Process CMD: %s")` string:
+
+        if ( v17 == (unsigned __int16)result )
+        {
+    LABEL_21:
+          v18 = GEngine;
+          if ( GEngine )
+          {
+            if ( *(_DWORD *)(v4 + 8) )
+              v19 = *(TCHAR **)v4;
+            else
+              v19 = Stream;
+            if ( *(_QWORD *)aXenuinesdkCarv_157 )
+            {
+              LODWORD(v40) = (GWorld - 0x301C4A02) ^ 0x2020A0E0;    // <------- References everywhere to GWorld.
+              v20 = (HIDWORD(GWorld) - 0x4F1B3530) ^ 0xE020E020;
+              HIDWORD(v40) = (HIDWORD(GWorld) - 0x4F1B3530) ^ 0xE020E020;
+              v21 = v40;
+            }
+            else
+            {
+              v21 = xenuine::decrypt(0x483EDD5Fi64, GWorld);
+              v18 = GEngine;                                        // <------- Also references to GEngine around here.
+            }
+            v22 = *(_QWORD *)(v18 + 40);
+            v23 = sub_7FF78395DFC0(v20);
+            (*(void (__fastcall **)(__int64, __int64, TCHAR *, __int64, __int64))(v22 + 8))(
+              GEngine + 0x28,
+              v21,
+              v19,
+              v23,
+              -2i64);
+            if ( *(_DWORD *)(v4 + 8) )
+              v12 = *(TCHAR **)v4;
+            FString::Printf(&v37, "Process CMD: %s", v12);          // <----------- the "Process CMD: %s" string reference.
+            v35 = 0i64;
+            v36 = 4i64;
+            sub_7FF783093160(&v35, 0i64);
+            sub_7FF78544ADE0(v35, "Log", 8i64);                     // <----------- also this "Log" string reference.
+            result = (*(__int64 (__fastcall **)(__int64, __int64 *, __int64 *))(*(_QWORD *)v6 + 8i64))(v6, &v35, &v37);
+            if ( v35 )
+              result = sub_7FF782DFADE0(v35);
+            if ( v37 )
+              result = sub_7FF782DFADE0(v37);
+
+
+        .text:00007FF783615571                          loc_7FF783615571:               ; CODE XREF: sub_7FF783615490+AC↑j
+        .text:00007FF783615571 48 8B 1D F0 27 F5 04     mov     rbx, cs:GEngine
+        .text:00007FF783615578 48 85 DB                 test    rbx, rbx
+        .text:00007FF78361557B 0F 84 93 02 00 00        jz      loc_7FF783615814
+        .text:00007FF78361557B
+        .text:00007FF783615581 41 83 7C 24 08 00        cmp     dword ptr [r12+8], 0
+        .text:00007FF783615587 74 06                    jz      short loc_7FF78361558F
+        .text:00007FF783615587
+        .text:00007FF783615589 49 8B 34 24              mov     rsi, [r12]
+        .text:00007FF78361558D EB 03                    jmp     short loc_7FF783615592
+        .text:00007FF78361558D
+        .text:00007FF78361558F                          ; ---------------------------------------------------------------------------
+        .text:00007FF78361558F
+        .text:00007FF78361558F                          loc_7FF78361558F:               ; CODE XREF: sub_7FF783615490+F7↑j
+        .text:00007FF78361558F 48 8B F7                 mov     rsi, rdi
+        .text:00007FF78361558F
+        .text:00007FF783615592
+        .text:00007FF783615592                          loc_7FF783615592:               ; CODE XREF: sub_7FF783615490+FD↑j
+        .text:00007FF783615592 48 8B 0D 8F A9 F9 04     mov     rcx, cs:GWorld                  ; <-------- GWorld reference
+        .text:00007FF783615599 48 83 3D 5F 6A 44 03 00  cmp     qword ptr cs:aXenuinesdkCarv_157, 0 ; "XENUINESDK_CARVE"
+        .text:00007FF7836155A1 75 1D                    jnz     short loc_7FF7836155C0
+        .text:00007FF7836155A1
+        .text:00007FF7836155A3 48 8B D1                 mov     rdx, rcx
+        .text:00007FF7836155A6 B9 5F DD 3E 48           mov     ecx, 483EDD5Fh
+        .text:00007FF7836155AB FF 15 77 6A 44 03        call    cs:qword_7FF786A5C028
+        .text:00007FF7836155AB
+        .text:00007FF7836155B1 4C 8B F0                 mov     r14, rax
+        .text:00007FF7836155B4 48 8B 1D AD 27 F5 04     mov     rbx, cs:GEngine                 ; <-------- GEngine reference
+        .text:00007FF7836155BB 45 33 FF                 xor     r15d, r15d
+        .text:00007FF7836155BE EB 2C                    jmp     short loc_7FF7836155EC
+        .text:00007FF7836155BE
+        .text:00007FF7836155C0                          ; ---------------------------------------------------------------------------
+        .text:00007FF7836155C0
+        .text:00007FF7836155C0                          loc_7FF7836155C0:                       ; CODE XREF: sub_7FF783615490+111↑j
+        .text:00007FF7836155C0 45 33 FF                 xor     r15d, r15d
+        .text:00007FF7836155C3 4C 89 7D 30              mov     [rbp+arg_0], r15
+        .text:00007FF7836155C7 8D 81 FE B5 E3 CF        lea     eax, [rcx-301C4A02h]
+        .text:00007FF7836155CD 35 E0 A0 20 20           xor     eax, 2020A0E0h
+        .text:00007FF7836155D2 89 45 30                 mov     dword ptr [rbp+arg_0], eax
+        .text:00007FF7836155D5 48 C1 E9 20              shr     rcx, 20h
+        .text:00007FF7836155D9 81 E9 30 35 1B 4F        sub     ecx, 4F1B3530h
+        .text:00007FF7836155DF 81 F1 20 E0 20 E0        xor     ecx, 0E020E020h
+        .text:00007FF7836155E5 89 4D 34                 mov     dword ptr [rbp+arg_0+4], ecx
+        .text:00007FF7836155E8 4C 8B 75 30              mov     r14, [rbp+arg_0]
+        .text:00007FF7836155E8
+        .text:00007FF7836155EC
+        .text:00007FF7836155EC                          loc_7FF7836155EC:               ; CODE XREF: sub_7FF783615490+12E↑j
+        .text:00007FF7836155EC 48 8B 5B 28              mov     rbx, [rbx+28h]
+        .text:00007FF7836155F0 E8 CB 89 34 00           call    sub_7FF78395DFC0
+        .text:00007FF7836155F0
+        .text:00007FF7836155F5 4C 8B C8                 mov     r9, rax
+        .text:00007FF7836155F8 48 8B 0D 69 27 F5 04     mov     rcx, cs:GEngine                 ; <-------- GEngine reference
+        .text:00007FF7836155FF 48 83 C1 28              add     rcx, 28h ; '('
+        .text:00007FF783615603 4C 8B C6                 mov     r8, rsi
+        .text:00007FF783615606 49 8B D6                 mov     rdx, r14
+        .text:00007FF783615609 FF 53 08                 call    qword ptr [rbx+8]
+        .text:00007FF783615609
+        .text:00007FF78361560C 41 83 7C 24 08 00        cmp     dword ptr [r12+8], 0
+        .text:00007FF783615612 74 04                    jz      short loc_7FF783615618
+        .text:00007FF783615612
+        .text:00007FF783615614 49 8B 3C 24              mov     rdi, [r12]
+        .text:00007FF783615614
+        .text:00007FF783615618
+        .text:00007FF783615618                          loc_7FF783615618:               ; CODE XREF: sub_7FF783615490+182↑j
+        .text:00007FF783615618 4C 8B C7                 mov     r8, rdi
+        .text:00007FF78361561B 48 8D 15 66 6D 44 03     lea     rdx, aProcessCmdS               ; <--------  The "Process CMD: %s" string 
+        .text:00007FF783615622 48 8D 4D E8              lea     rcx, [rbp+var_18]
+        .text:00007FF783615626 E8 15 0D 25 02           call    FString__Printf
+        .text:00007FF783615626
+        .text:00007FF78361562B 90                       nop
+        .text:00007FF78361562C 4C 89 7D D8              mov     [rbp+var_28], r15
+        .text:00007FF783615630 48 C7 45 E0 04 00 00 00  mov     [rbp+var_20], 4
+        .text:00007FF783615638 33 D2                    xor     edx, edx
+        .text:00007FF78361563A 48 8D 4D D8              lea     rcx, [rbp+var_28]
+        .text:00007FF78361563E E8 1D DB A7 FF           call    sub_7FF783093160
+
+
+
+**                                 **
+** Finding `ProcessEvent` address  **
+**                                 **
+
+        [SIG: 48 B8 ? ? ? ? ? ? ? ? 48 8B CF 48 C1 E1 20 48 33 C8 48 33 CF]
+        
+        .text:00007FF73E36809A 48 B8 59 45 69 74 2A EF 8A 05 mov     rax, 58AEF2A74694559h
+        .text:00007FF73E3680A4 48 8B CF                      mov     rcx, rdi
+        .text:00007FF73E3680A7 48 C1 E1 20                   shl     rcx, 20h
+        .text:00007FF73E3680AB 48 33 C8                      xor     rcx, rax
+        
+        Search for the string TEXT("AnimNotify_%s") which is located inside the  `UAnimInstance::TriggerSingleAnimNotify` method. 
+        The function using this string as an argument is `FString::Printf`. In the disassembly you'll see two if blocks, those are on 
+        the notification event and state class. Below is a call to a function that passes in v42 (0), this is `ProcessEvent`. The
+        disassembly of the function is provided below.
+        
+        
+        .text:00007FF73CC207DC
+        .text:00007FF73CC207DC                               loc_7FF73CC207DC:                       ; CODE XREF: sub_7FF73CC20670+165↑j
+        .text:00007FF73CC207DC 4C 8B C3                      mov     r8, rbx
+        .text:00007FF73CC207DC
+        .text:00007FF73CC207DF
+        .text:00007FF73CC207DF                               loc_7FF73CC207DF:                       ; CODE XREF: sub_7FF73CC20670+16A↑j
+        .text:00007FF73CC207DF 48 8D 15 8A A5 0D 03          lea     rdx, aAnimnotifyS               ; "AnimNotify_%s" <-- Target string
+        .text:00007FF73CC207E6 48 8D 4C 24 28                lea     rcx, [rsp+78h+FStringThis]
+        .text:00007FF73CC207EB E8 90 E6 B7 00                call    sub_7FF73D79EE80               ; <--- FString::Printf
+        .text:00007FF73CC207EB
+        .text:00007FF73CC207F0 90                            nop
+        .text:00007FF73CC207F1 48 8B 4C 24 38                mov     rcx, [rsp+78h+FuncFName]
+        .text:00007FF73CC207F6 48 85 C9                      test    rcx, rcx
+        .text:00007FF73CC207F9 74 06                         jz      short loc_7FF73CC20801
+        .text:00007FF73CC207F9
+        .text:00007FF73CC207FB E8 B0 66 C8 FF                call    sub_7FF73C8A6EB0
+        .text:00007FF73CC207FB
+        .text:00007FF73CC20800 90                            nop
+        .text:00007FF73CC20800
+        .text:00007FF73CC20801
+        .text:00007FF73CC20801                               loc_7FF73CC20801:                       ; CODE XREF: sub_7FF73CC20670+189↑j
+        .text:00007FF73CC20801 83 7C 24 30 00                cmp     [rsp+78h+var_48], 0
+        .text:00007FF73CC20806 48 0F 45 5C 24 28             cmovnz  rbx, [rsp+78h+FStringThis]
+        .text:00007FF73CC2080C 41 B8 01 00 00 00             mov     r8d, 1
+        .text:00007FF73CC20812 48 8B D3                      mov     rdx, rbx
+        .text:00007FF73CC20815 48 8D 8C 24 88 00 00 00       lea     rcx, [rsp+78h+arg_8]
+        .text:00007FF73CC2081D E8 2E 90 A8 FF                call    sub_7FF73C6A9850
+        .text:00007FF73CC2081D
+        .text:00007FF73CC20822 48 8B 94 24 88 00 00 00       mov     rdx, [rsp+78h+arg_8]
+        .text:00007FF73CC2082A 49 8B CE                      mov     rcx, r14
+        .text:00007FF73CC2082D E8 2E 78 74 01                call    ProcessEvent                   ; <-- Booyah. Check xrefs and disassembly to verify it's `ProcessEvent`
+        .text:00007FF73CC2082D
+        .text:00007FF73CC20832 48 8B E8                      mov     rbp, rax
+        .text:00007FF73CC20835 48 85 C0                      test    rax, rax
+        .text:00007FF73CC20838 0F 84 C9 00 00 00             jz      loc_7FF73CC20907
+        .text:00007FF73CC20838
+        .text:00007FF73CC2083E 0F B6 80 10 01 00 00          movzx   eax, byte ptr [rax+110h]
+        .text:00007FF73CC20845 84 C0                         test    al, al
+        .text:00007FF73CC20847 75 18                         jnz     short loc_7FF73CC20861
+        .text:00007FF73CC20847
+        .text:00007FF73CC20849 4D 8B 0E                      mov     r9, [r14]
+        .text:00007FF73CC2084C 45 33 C0                      xor     r8d, r8d
+        .text:00007FF73CC2084F 48 8B D5                      mov     rdx, rbp
+        .text:00007FF73CC20852 49 8B CE                      mov     rcx, r14
+        .text:00007FF73CC20855 41 FF 91 00 02 00 00          call    qword ptr [r9+200h]
+        .text:00007FF73CC20855
+        .text:00007FF73CC2085C E9 A6 00 00 00                jmp     loc_7FF73CC2090
+        
+        The pseudo-C shown below is calling the actual ProcessEvent function in `AActor::ProcessEvent``. It's either hashing the UFunction *, or decrypting it.
+        
+        __int64 __fastcall ProcessEventStub(__int64 a1, __int64 a2)
+        {
+          __int64 v2; // rdi
+          __int64 v3; // rbx
+          __int64 v4; // rcx
+          __int64 v5; // rcx
+
+          v2 = *(_QWORD *)(a1 + 40);
+          v3 = a2;
+          tslgame_AK::MemoryMgr::StartProfileThreadUsage(a1);
+          tslgame_AK::MemoryMgr::StartProfileThreadUsage(v4);
+          tslgame_AK::MemoryMgr::StartProfileThreadUsage(v5);
+          return ProcessEvent(
+                   __ROL8__(v2 ^ 0x6BA1134FC37AC61Di64, 14) ^ (__ROL8__(v2 ^ 0x6BA1134FC37AC61Di64, 14) << 32) ^ 0x58AEF2A74694559i64,
+                   v3,
+                   1i64);
+        }
+
+**                                     **
+** Finding `UKismetMathLibrary` global **
+**                                     **
+
+        To find the UKismetMathLibrary pointer you have to search for the string TEXT("ZeroLengthProjectionWarning").
+        Once found, you'll follow the xref of the first occurrence. You'll get to a region of disassembly that looks like below.
+        
+        .text:00007FF73D7CBB9F 4C 8D 0D 62 9A 86 02          lea     r9, aZerolengthproj             ; "ZeroLengthProjectionWarning"
+        .text:00007FF73D7CBBA6 4C 8D 05 1B 9B 86 02          lea     r8, aUkismetmathlib_2           ; "UKismetMathLibrary"
+        .text:00007FF73D7CBBAD 48 8D 15 0C A6 86 02          lea     rdx, aProjectionOnto            ; "Projection onto vector of zero length"
+        .text:00007FF73D7CBBB4 48 8D 4D D8                   lea     rcx, [rbp-28h]
+        .text:00007FF73D7CBBB8 E8 23 68 DF FF                call    sub_7FF73D5C23E0
+        
+        Scroll up until you reach the `DivideByZeroWarning` string reference, you'll see in IDA a comment that says
+        "; START OF FUNCTION CHUNK FOR xxxyyy" - follow the xref to the subroutine noted. This sub is the `UKismetMathLibrary::ctor`,
+        in order to locate where it is initialized we follow the references to the ctor and wind up in an engine initialization function.
+        At the top of the function you'll see a comparison to 0 against a QWORD value. This is the global pointer to the UKismetMathLibrary.
+        
+        The disassembly is presented below.
+        
+        .text:00007FF73CCD2590 48 81 EC 98 00 00 00          sub     rsp, 98h
+        .text:00007FF73CCD2597 48 83 3D C1 13 A7 04 00       cmp     cs:gUKismetMathLibrary, 0
+        .text:00007FF73CCD259F 0F 85 B2 00 00 00             jnz     loc_7FF73CCD2657
+        .text:00007FF73CCD259F
+        .text:00007FF73CCD25A5 E8 B6 70 4B FF                call    sub_7FF73C189660
+        .text:00007FF73CCD25A5
+        .text:00007FF73CCD25AA 48 89 44 24 70                mov     [rsp+98h+var_28], rax
+        .text:00007FF73CCD25AF E8 1C 77 32 00                call    sub_7FF73CFF9CD0
+        .text:00007FF73CCD25AF
+        .text:00007FF73CCD25B4 48 89 44 24 78                mov     [rsp+98h+var_20], rax
+        .text:00007FF73CCD25B9 48 8D 0D 50 6B 08 03          lea     rcx, aUkismetmathlib_0          ; "UKismetMathLibrary"
+        .text:00007FF73CCD25C0 48 83 C1 02                   add     rcx, 2
+        .text:00007FF73CCD25C4 48 89 8C 24 80 00 00 00       mov     [rsp+98h+var_18], rcx
+        .text:00007FF73CCD25CC E8 6F 06 64 FF                call    sub_7FF73C312C40
+        .text:00007FF73CCD25CC
+        .text:00007FF73CCD25D1 C6 44 24 68 00                mov     [rsp+98h+var_30], 0
+        .text:00007FF73CCD25D6 48 8D 0D B3 83 DE FE          lea     rcx, sub_7FF73BABA990
+        .text:00007FF73CCD25DD 48 89 4C 24 60                mov     [rsp+98h+var_38], rcx
+        .text:00007FF73CCD25E2 48 8D 0D 57 83 DE FE          lea     rcx, sub_7FF73BABA940
+        .text:00007FF73CCD25E9 48 89 4C 24 58                mov     [rsp+98h+var_40], rcx
+        .text:00007FF73CCD25EE 48 8D 0D 4B 5A D2 FE          lea     rcx, tslgame_AK__MemoryMgr__StartProfileThreadUsage
+        .text:00007FF73CCD25F5 48 89 4C 24 50                mov     [rsp+98h+var_48], rcx
+        .text:00007FF73CCD25FA 48 8D 0D CF 76 32 00          lea     rcx, sub_7FF73CFF9CD0
+        .text:00007FF73CCD2601 48 89 4C 24 48                mov     [rsp+98h+var_50], rcx
+        .text:00007FF73CCD2606 48 8D 0D 53 AA FE FF          lea     rcx, UKismetMathLibrary__UKismetMathLibraryCtor
+        .text:00007FF73CCD260D 48 89 4C 24 40                mov     [rsp+98h+var_58], rcx
+        .text:00007FF73CCD2612 48 8B 4C 24 70                mov     rcx, [rsp+98h+var_28]
+        .text:00007FF73CCD2617 48 89 4C 24 38                mov     [rsp+98h+var_60], rcx
+        .text:00007FF73CCD261C 48 8B 4C 24 78                mov     rcx, [rsp+98h+var_20]
+        .text:00007FF73CCD2621 48 89 4C 24 30                mov     [rsp+98h+var_68], rcx
+        .text:00007FF73CCD2626 C7 44 24 28 00 00 00 10       mov     dword ptr [rsp+98h+var_70], 10000000h
+        .text:00007FF73CCD262E C7 44 24 20 30 00 00 00       mov     dword ptr [rsp+98h+var_78], 30h
+        .text:00007FF73CCD2636 4C 8D 0D 13 67 00 00          lea     r9, sub_7FF73CCD8D50
+        .text:00007FF73CCD263D 4C 8D 05 1C 13 A7 04          lea     r8, gUKismetMathLibrary
+        .text:00007FF73CCD2644 48 8B 8C 24 80 00 00 00       mov     rcx, [rsp+98h+var_18]
+        .text:00007FF73CCD264C 48 8B D1                      mov     rdx, rcx
+        .text:00007FF73CCD264F 48 8B C8                      mov     rcx, rax
+        .text:00007FF73CCD2652 E8 69 DC BF 01                call    sub_7FF73E8D02C0
+        .text:00007FF73CCD2652
+        .text:00007FF73CCD2657
+        .text:00007FF73CCD2657                               loc_7FF73CCD2657:                       ; CODE XREF: sub_7FF73CCD2590+F↑j
+        .text:00007FF73CCD2657 48 8B 05 02 13 A7 04          mov     rax, cs:gUKismetMathLibrary
+        .text:00007FF73CCD265E 48 81 C4 98 00 00 00          add     rsp, 98h
+        .text:00007FF73CCD2665 C3                            retn
+        .text:00007FF73CCD2665
+        .text:00007FF73CCD2665                               sub_7FF73CCD2590 endp
+
+
+
+**                                 **
+** PUBG 5.3.4.10 Unreal Core Types **
+**                                 **
+
+UObject {
+void** VtablePtr; // 0x00
+FNameEncrypted Name; // 0x08
+uint64_t InternalIndexEncrypted; // 0x10
+uint64_t OuterEncrypted; // 0x18
+int ObjectFlagsEncrypted; // 0x20
+uint64_t ClassEncrypted; // 0x28
+}
+
+UField : UObject {
+UField* Next; // 0x30
+}
+
+UStruct : UField {
+int32_t MinAlignment; // 0x90
+UProperty* DestructorLink; // 0x98
+UField* Children; // 0xA0
+TArray<uint8_t> Script; // 0xA8
+class UStruct* SuperStruct; // 0xB8
+int32_t PropertiesSize; // 0xC0
+TArray<UObject*> ScriptObjectReferences; // 0xD0
+UProperty* PropertyLink; // 0xE0
+}
+
+UFunction : UStruct {
+uint16_t ParmsSize; // 0xF0
+UProperty* FirstPropertyToInit; // 0xF8
+int32_t FunctionFlags; // 0x100
+int16_t NumParms; // 0x108
+} // size=0x130
+
+UClass : UStruct {
+FClassBaseChain FClassBaseChain; // 0xE8
+UClass* ClassWithin; // 0x120
+UObject* ClassGeneratedBy; // 0x1D0
+UObject* ClassDefaultObject; // 0x230
+TArray<UField*> NetFields; // 0x250
+} // size=0x2B8
