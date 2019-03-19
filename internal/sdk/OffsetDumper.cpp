@@ -114,7 +114,8 @@ int DumpObjects()
     uint32_t ImageSize = utils::GetModuleSize((HMODULE)ImageBase);
 
     // Signature inside of FUObjectArray::FreeUObjectIndex to get the
-    // InternalIndexEncrypted field of UObject and ObjObjects.ObjectsEncrypted decryption.
+    // UObject::InternalIndexEncrypted field and FUObjectArray::ObjObjects.ObjectsEncrypted
+    // inline decryption.
     // F0 4D 0F B1 24 0F
     //const uint8_t FreeUObjectIndexSig[] = {
     //    0xF0, 0x4D, 0x0F, 0xB1, 0x24, 0x0F          /* lock cmpxchg [r15+rcx], r12 */
@@ -158,7 +159,7 @@ int DumpObjects()
         NextIp = Ip + Inst->size;
         NextOffset = Offset + Inst->size;
 
-        // Search for the beginning of the InternalIndexEncrypted decryption, which
+        // Search for the beginning of the UObject::InternalIndexEncrypted decryption, which
         // is near the beginning within the first 10 instructions.
         /* mov     ebx, [rdx+28h] ; Object->InternalIndexEncrypted */
         if (InstIndex < 10 &&
@@ -166,9 +167,12 @@ int DumpObjects()
             Inst->ops[0].type == O_REG &&
             Inst->ops[1].type == O_SMEM) {
 
-            // We found the beginning of the InternalIndexEncrypted decryption!
+            // We found the beginning of the UObject::InternalIndexEncrypted decryption!
             ObjectInternalIndexEncryptedOffset = static_cast<size_t>(Inst->disp);
             ObjectInternalIndexEncryptedRegister = Inst->ops[0].index;
+            LOG_INFO(_XOR_("Found UObject::InternalIndexEncrypted offset: 0x%X (%s)"),
+                     ObjectInternalIndexEncryptedOffset,
+                     RegisterStrings[ObjectInternalIndexEncryptedRegister]);
 
             // Increment next instruction twice.
             INCREMENT_NEXT_INSTRUCTION();
@@ -176,14 +180,19 @@ int DumpObjects()
             // Shave off any decryption fuckery nop calls.
             SKIP_FUCKERY_NOP_CALLS();
 
-            // Make sure this is the instruction that gets the ObjObjects.ObjectsEncrypted.
+            // Make sure this is the instruction that gets the value of the
+            // FUObjectArray::ObjObjects.ObjectsEncrypted field.
             /* mov     rcx, [rdi+10h] */
             if (NextInst->opcode == I_MOV &&
                 NextInst->ops[0].type == O_REG &&
                 NextInst->ops[1].type == O_SMEM) {
 
+                // Found the ObjObjects.ObjectsEncrypted offset and register!
                 ObjectsEncryptedOffset = static_cast<size_t>(NextInst->disp);
                 ObjectsEncryptedRegister = NextInst->ops[0].index;
+                LOG_INFO(_XOR_("Found FUObjectArray::ObjObjects.ObjectsEncrypted offset: 0x%X (%s)"),
+                         ObjectsEncryptedOffset, RegisterStrings[ObjectsEncryptedRegister]);
+
                 // Increment instruction.
                 INCREMENT_NEXT_INSTRUCTION();
 
@@ -191,14 +200,16 @@ int DumpObjects()
                 LOG_ERROR(_XOR_("Failed to find instruction that gets ObjectsEncrypted!"));
             }
 
-            // The next series of instructions is the NameEncrypted decryption.
+            // The next series of instructions is the UObject::InternalIndexEncrypted decryption.
             ObjectInternalIndexDecryptionBegin = NextIp;
+            LOG_INFO(_XOR_("Found the UObject::InternalIndexEncrypted decryption beginning: 0x%p"),
+                     ObjectInternalIndexDecryptionBegin);
 
             // Handle the next instruction.
             goto Next1;
         }
 
-        // Search for the end of the InternalIndexEncrypted decryption.
+        // Search for the end of the UObject::InternalIndexEncrypted decryption.
         if (ObjectInternalIndexDecryptionBegin && !ObjectInternalIndexDecryptionEnd) {
 
             /* cmp     qword ptr cs:aXenuinesdkCarv_159, r12 ; "XENUINESDK_CARVE"
@@ -206,32 +217,36 @@ int DumpObjects()
              */
             if (Inst->opcode == I_CMP && NextInst->opcode == I_JNZ) {
 
-                // We found the ending of the InternalIndexEncrypted decryption!
+                // We found the ending of the UObject::InternalIndexEncrypted decryption!
                 ObjectInternalIndexDecryptionEnd = Ip;
+                LOG_INFO(_XOR_("Found the UObject::InternalIndexEncrypted decryption ending: 0x%p"),
+                         ObjectInternalIndexDecryptionEnd);
 
-                // The instructions at the jnz target is the ObjectsEncrypted decryption.
-                //
-                // .text:00007FF785416CC4 4C 39 25 35 AD DA 01  cmp     qword ptr cs:aXenuinesdkCarv_159, r12 ; "XENUINESDK_CARVE"
-                // .text:00007FF785416CCB 75 13                 jnz     short loc_7FF785416CE0
-                // .text:00007FF785416CCD 48 8B D1              mov     rdx, rcx                        ; _QWORD
-                // .text:00007FF785416CD0 B9 D1 DD 3E 48        mov     ecx, 483EDDD1h                  ; _QWORD
-                // .text:00007FF785416CD5 FF 15 4D AD DA 01     call    cs:Xenuine__Decrypt_159
-                // .text:00007FF785416CDB 48 8B C8              mov     rcx, rax
-                // .text:00007FF785416CDE EB 35                 jmp     short loc_7FF785416D15          ; <-- This jumps to the end of decryption
-                // .text:00007FF785416CE0                       ; ---------------------------------------------------------------------------
-                // .text:00007FF785416CE0                       loc_7FF785416CE0:                       ; CODE XREF: FUObjectArray__FreeUObjectIndex+4B^j
-                // .text:00007FF785416CE0 8D 81 7A 4E E6 A6     lea     eax, [rcx-5919B186h]            ; <-- Decryption starts here.
-                //
+                // The instructions at the jnz target is the FUObjectArray::ObjObjects.ObjectsEncrypted decryption:
+                // .text:7FF785416CC4 4C 39 25 35 AD DA 01  cmp     qword ptr cs:aXenuinesdkCarv_159, r12 ; "XENUINESDK_CARVE"
+                // .text:7FF785416CCB 75 13                 jnz     short loc_7FF785416CE0
+                // .text:7FF785416CCD 48 8B D1              mov     rdx, rcx                        ; _QWORD
+                // .text:7FF785416CD0 B9 D1 DD 3E 48        mov     ecx, 483EDDD1h                  ; _QWORD
+                // .text:7FF785416CD5 FF 15 4D AD DA 01     call    cs:Xenuine__Decrypt_159
+                // .text:7FF785416CDB 48 8B C8              mov     rcx, rax
+                // .text:7FF785416CDE EB 35                 jmp     short loc_7FF785416D15          ; <-- This jumps to the end of decryption
+                // .text:7FF785416CE0                       ; ---------------------------------------------------------------------------
+                // .text:7FF785416CE0                       loc_7FF785416CE0:                       ; CODE XREF: FUObjectArray__FreeUObjectIndex+4B^j
+                // .text:7FF785416CE0 8D 81 7A 4E E6 A6     lea     eax, [rcx-5919B186h]            ; <-- Decryption starts here.
                 TargetAddress = INSTRUCTION_GET_TARGET(NextInst);
+                ObjectsDecryptionBegin = reinterpret_cast<uint8_t*>(TargetAddress);
+                LOG_INFO(_XOR_("Found the FUObjectArray::ObjObjects.ObjectsEncrypted decryption beginning: 0x%p"),
+                         ObjectsDecryptionBegin);
                 INCREMENT_NEXT_INSTRUCTION();
                 DisData* PrevInst = NextInst;
                 while (NextInst->addr != TargetAddress) {
                     PrevInst = NextInst;
                     INCREMENT_NEXT_INSTRUCTION();
                 }
-                ObjectsDecryptionBegin = reinterpret_cast<uint8_t*>(TargetAddress);
                 TargetAddress = INSTRUCTION_GET_TARGET(PrevInst);
                 ObjectsDecryptionEnd = reinterpret_cast<uint8_t*>(TargetAddress);
+                LOG_INFO(_XOR_("Found the FUObjectArray::ObjObjects.ObjectsEncrypted decryption ending: 0x%p"),
+                         ObjectsDecryptionEnd);
 
                 // We are done!
                 break;
@@ -328,6 +343,8 @@ int DumpObjects()
             // We found the UObject::ObjectFlagsEncrypted offset!
             ObjectFlagsEncryptedOffset = static_cast<size_t>(Inst->disp);
             ObjectFlagsEncryptedRegister = Inst->ops[0].index;
+            LOG_INFO(_XOR_("Found UObject::ObjectFlagsEncrypted offset: 0x%X (%s)"),
+                     ObjectFlagsEncryptedOffset, RegisterStrings[ObjectFlagsEncryptedRegister]);
 
             // Increment next instruction.
             INCREMENT_NEXT_INSTRUCTION();
@@ -336,6 +353,8 @@ int DumpObjects()
 
             // We found the beginning of the UObject::ObjectFlagsEncrypted decryption.
             ObjectFlagsDecryptionBegin = NextIp;
+            LOG_INFO(_XOR_("Found the UObject::ObjectFlagsEncrypted decryption beginning: 0x%p"),
+                     ObjectFlagsDecryptionBegin);
             // Search for the ending of the UObject::ObjectFlagsEncrypted inline decryption.
             DisData* PrevInst = NextInst;
             uint8_t* PrevIp = NextIp;
@@ -347,19 +366,29 @@ int DumpObjects()
             }
             // We found the ending of the UObject::ObjectFlagsEncrypted inline encryption.
             ObjectFlagsDecryptionEnd = PrevIp;
+            LOG_INFO(_XOR_("Found the UObject::ObjectFlagsEncrypted decryption ending: 0x%p"),
+                     ObjectFlagsDecryptionEnd);
 
             // Handle the next instruction.
             goto Next2;
         }
 
         // The first call instruction is a call to the UObjectBaseUtility::GetOutermost routine.
-        if (Inst->opcode == I_CALL && Inst->ops[0].type == O_PC) {
+        if (Inst->opcode == I_CALL) {
+            // Make sure this is the correct call instruction!
+            if (Inst->ops[0].type == O_PC) {
+                // Get the address of the UObjectBaseUtility::GetOutermost routine.
+                TargetAddress = INSTRUCTION_GET_TARGET(Inst);
+                LOG_INFO(_XOR_("Found the UObjectBaseUtility::GetOutermost routine: 0x%p"),
+                         TargetAddress);
+                // We're done!
+                break;
+            } else {
+                LOG_WARN(_XOR_("Not the correct call to UObjectBaseUtility::GetOutermost routine!"));
+            }
 
-            // Get the address of the UObjectBaseUtility::GetOutermost routine.
-            TargetAddress = INSTRUCTION_GET_TARGET(NextInst);
-
-            // We're done!
-            break;
+            // Handle the next instruction.
+            goto Next2;
         }
 
     Next2:
@@ -377,6 +406,14 @@ int DumpObjects()
     }
     // Set the Found address to UObjectBaseUtility::GetOutermost.
     Found = reinterpret_cast<const uint8_t *>(TargetAddress);
+
+    LOG_INFO(_XOR_("UObjectBaseUtility::GetOutermost code = {"));
+    std::string GetOutermostString = utils::FormatBuffer(Found, 256);
+    for (auto Line : utils::SplitString(GetOutermostString, '\n')) {
+        LOG_INFO(Line.c_str());
+    }
+    LOG_INFO(_XOR_("};"));
+
 
     // Disassemble the UObjectBaseUtility::GetOutermost routine.
     rc = DisDecompose(Found,
@@ -408,7 +445,7 @@ int DumpObjects()
         // Search for the beginning of the OuterEncrypted decryption, which
         // is near the beginning within the first 7 instructions.
         /* mov     rbx, [rcx+10h] ; Object->OuterEncrypted */
-        if (InstIndex < 7 &&
+        if (InstIndex < 10 &&
             Inst->opcode == I_MOV &&
             Inst->ops[0].type == O_REG &&
             Inst->ops[1].type == O_SMEM) {
@@ -416,6 +453,8 @@ int DumpObjects()
             // We found the UObject::OuterEncrypted offset!
             ObjectOuterEncryptedOffset = static_cast<size_t>(Inst->disp);
             ObjectOuterEncryptedRegister = Inst->ops[0].index;
+            LOG_INFO(_XOR_("Found UObject::OuterEncrypted offset: 0x%X (%s)"),
+                     ObjectOuterEncryptedOffset, RegisterStrings[ObjectOuterEncryptedRegister]);
 
             // Increment next instruction.
             INCREMENT_NEXT_INSTRUCTION();
@@ -424,6 +463,8 @@ int DumpObjects()
 
             // We found the beginning of the UObject::OuterEncrypted inline decryption.
             ObjectOuterDecryptionBegin = NextIp;
+            LOG_INFO(_XOR_("Found the UObject::OuterEncrypted decryption beginning: 0x%p"),
+                     ObjectOuterDecryptionBegin);
             // Search for the end of the UObject::OuterEncrypted inline decryption.
             INCREMENT_NEXT_INSTRUCTION();
             while (META_GET_FC(NextInst->meta) != FC_CND_BRANCH) {
@@ -431,6 +472,8 @@ int DumpObjects()
             }
             // We found the ending of the UObject::OuterEncrypted inline decryption.
             ObjectOuterDecryptionEnd = NextIp;
+            LOG_INFO(_XOR_("Found the UObject::OuterEncrypted decryption ending: 0x%p"),
+                     ObjectOuterDecryptionEnd);
 
             // We are done!
             break;
@@ -1153,6 +1196,114 @@ struct FieldMapEntry {
 
 typedef std::map<size_t, FieldMapEntry> FieldMapType;
 
+int32_t DumpStruct(std::wstring Name,
+                   std::vector<std::wstring>* InheritedStructs,
+                   std::map<size_t, FieldMapEntry>* FieldMap,
+                   size_t StartOffset = 0,
+                   size_t StartSize = 0)
+{
+    size_t Offset = StartOffset;
+    size_t Size = StartSize;
+    size_t StructSize = 0;
+    UnrealObjectSizeMapType::iterator SizeIter;
+    FieldMapType::iterator FieldIter;
+
+    if (!InheritedStructs) {
+
+        LOG_INFO(_XOR_("class %ws {"), Name.c_str());
+
+    } else {
+
+        std::vector<std::wstring>::iterator InheritedStructIter = InheritedStructs->begin();
+
+        // Add the first inherited struct to the inherit string.
+        std::wstring InheritString = _XORSTR_(L": public ") + *InheritedStructIter;
+
+        // Adjust the offset.
+        SizeIter = UnrealObjectSizeMap.find(*InheritedStructIter);
+        if (SizeIter != UnrealObjectSizeMap.end()) {
+            Offset += SizeIter->second;
+        } else {
+            LOG_ERROR(_XOR_("COULD NOT FIND INHERITED STRUCT \"%ws\" SIZE!"),
+                      InheritedStructIter->c_str());
+            return E_NOT_SET;
+        }
+
+        // Iterate to the second inherited struct.
+        ++InheritedStructIter;
+        // Iterate through the remaining inherited structs.
+        while (InheritedStructIter != InheritedStructs->end()) {
+            // Add inherited struct name to the inherit string.
+            InheritString += _XORSTR_(L", public ") + *InheritedStructIter;
+
+            // Adjust the offset.
+            SizeIter = UnrealObjectSizeMap.find(*InheritedStructIter);
+            if (SizeIter != UnrealObjectSizeMap.end()) {
+                Offset += SizeIter->second;
+            } else {
+                LOG_ERROR(_XOR_("COULD NOT FIND INHERITED STRUCT \"%ws\" SIZE!"),
+                          InheritedStructIter->c_str());
+                return E_NOT_SET;
+            }
+
+            // Iterate to the next inherited struct.
+            ++InheritedStructIter;
+        }
+        LOG_INFO(_XOR_("class %ws %ws {"), Name.c_str(), InheritString.c_str());
+    }
+    LOG_INFO(_XOR_("public:"));
+
+    if (FieldMap) {
+
+        // Dump the fields.
+        FieldIter = FieldMap->begin();
+        while (FieldIter != FieldMap->end()) {
+
+            // Get this field map entry.
+            FieldMapEntry Entry = FieldIter->second;
+
+            size_t LastOffset = Offset;
+            size_t LastSize = Size;
+            Offset = FieldIter->first;
+            Size = Entry.Size;
+
+            // Dump padding field to fill in space, if needed.
+            if (LastOffset + LastSize < Offset) {
+                size_t PaddingSize = Offset - (LastOffset + LastSize);
+                LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%X]; // 0x%04X (size=0x%04X)"),
+                         LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
+            }
+
+            // Dump the field.
+            LOG_INFO(_XOR_("    %s %s; // 0x%04X (size=0x%04X)"), Entry.TypeName, Entry.Name, Offset, Size);
+
+            // Iterate to the next field.
+            ++FieldIter;
+        }
+    } 
+
+    // Dump the struct size.
+    SizeIter = UnrealObjectSizeMap.find(Name);
+    if (SizeIter != UnrealObjectSizeMap.end()) {
+        StructSize = SizeIter->second;
+        if (StructSize > Offset + Size) {
+            size_t PaddingSize = StructSize - (Offset + Size);
+            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04X[0x%X]; // 0x%04X (size=0x%04X)"),
+                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
+        }
+        LOG_INFO(_XOR_("}; // size=0x%04X"), StructSize, Offset + Size);
+    } else {
+        StructSize = Offset + Size;
+        LOG_INFO(_XOR_("}; // guessed size=0x%04X"), Offset + Size);
+    }
+
+    // Dump a C_ASSERT for verification or struct size.
+    LOG_INFO(_XOR_("C_ASSERT(sizeof(%ws) == 0x%X);"), Name.c_str(), StructSize);
+
+    // Return struct size, indicating success.
+    return static_cast<int32_t>(StructSize);
+}
+
 int DumpStructs()
 {
     int rc;
@@ -1181,46 +1332,18 @@ int DumpStructs()
     // Dump the UObject fields.
     //
     std::map<size_t, FieldMapEntry> UObjectFieldMap;
+    UObjectFieldMap[0x00] = FIELD_MAP_ENTRY("VTable", void**);
     UObjectFieldMap[ObjectFlagsEncryptedOffset] = FIELD_MAP_ENTRY("ObjectFlagsEncrypted", int32_t);
     UObjectFieldMap[ObjectOuterEncryptedOffset] = FIELD_MAP_ENTRY("OuterEncrypted", uint64_t);
     UObjectFieldMap[ObjectInternalIndexEncryptedOffset] = FIELD_MAP_ENTRY("InternalIndexEncrypted", int32_t);
     UObjectFieldMap[ObjectClassEncryptedOffset] = FIELD_MAP_ENTRY("ClassEncrypted", uint64_t);
     UObjectFieldMap[ObjectNameIndexEncryptedOffset] = FIELD_MAP_ENTRY("NameIndexEncrypted", int32_t);
     UObjectFieldMap[ObjectNameNumberEncryptedOffset] = FIELD_MAP_ENTRY("NameNumberEncrypted", int32_t);
-    LOG_INFO(_XOR_("class UObject {"));
-    LOG_INFO(_XOR_("public:"));
-
-    LOG_INFO(_XOR_("    void **VTable; // 0x%04x (size=0x%04x)"), 0, sizeof(void**));
-    Offset = 0;
-    Size = sizeof(void**);
-    FieldIter = UObjectFieldMap.begin();
-    while (FieldIter != UObjectFieldMap.end()) {
-        FieldMapEntry Entry = FieldIter->second;
-        size_t LastOffset = Offset; Offset = FieldIter->first;
-        size_t LastSize = Size; Size = Entry.Size;
-        if (LastOffset + LastSize < Offset) {
-            size_t PaddingSize = Offset - (LastOffset + LastSize);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
-        }
-        LOG_INFO(_XOR_("    %s %s; // 0x%04x (size=0x%04x)"), Entry.TypeName, Entry.Name, Offset, Size);
-        ++FieldIter;
+    UObjectSize = DumpStruct(_XORSTR_(L"UObject"), nullptr, &UObjectFieldMap);
+    if (UObjectSize <= 0) {
+        LOG_ERROR(_XOR_("Failed to dump UObject rc %d"), rc);
+        return rc < 0 ? rc : E_FAIL;
     }
-
-    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UObject"));
-    if (SizeIter != UnrealObjectSizeMap.end()) {
-        UObjectSize = SizeIter->second;
-        if (UObjectSize > Offset + Size) {
-            size_t PaddingSize = UObjectSize - (Offset + Size);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
-        }
-        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UObjectSize, Offset + Size);
-    } else {
-        UObjectSize = Offset + Size;
-        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), Offset + Size);
-    }
-
 
     //
     // Dump the UField fields.

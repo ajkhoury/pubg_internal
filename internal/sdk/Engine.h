@@ -266,12 +266,14 @@ public:
 
 class UEnum : public UField {
 public:
-    uint8_t UnknownData0x0030[0x10]; // 0x0030 (size=0x0010)
+    FString CppType; // 0x0030 (size=0x0010)
     TArray<TPair<FName, int64_t>> Names; // 0x0040 (size=0x0010)
     uint8_t UnknownData0x0050[0x10]; // 0x0050 (size=0x0010)
     int32_t CppForm; // 0x0060 (size=0x0004)
-    uint8_t UnknownData0x0064[0xc]; // 0x0064 (size=0x000c)
+    uint8_t UnknownData0x0064[0x4]; // 0x0064 (size=0x0004)
+    void* EnumDisplayNameFn; // 0x0068  (size=0x0008)
 }; // size=0x0070
+C_ASSERT(sizeof(UEnum) == 0x70);
 
 //class UEnum : public UField {
 //public:
@@ -291,11 +293,13 @@ public:
     class UStruct* SuperStruct; // 0x0048 (size=0x0008)
     uint8_t UnknownData0x0050[0x90]; // 0x0050 (size=0x0090)
 }; // size=0x00e0
+C_ASSERT(sizeof(UStruct) == 0xE0);
 
 class UScriptStruct : public UStruct {
 public:
     uint8_t pad_0x00E0[0x10];                  // 0xE0
 }; // size=0xF0
+C_ASSERT(sizeof(UScriptStruct) == 0xF0);
 
 class UFunction : public UStruct {
 public:
@@ -303,6 +307,7 @@ public:
     int32_t FunctionFlags; // 0x00e8 (size=0x0004)
     uint8_t UnknownData0x00ec[0x3c]; // 0x00ec (size=0x003c)
 }; // size=0x0128
+C_ASSERT(sizeof(UFunction) == 0x0128);
 
 class FClassBaseChain {
 public:

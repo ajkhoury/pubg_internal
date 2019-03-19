@@ -360,8 +360,7 @@ void GeneratorPackage::GenerateClass(const ClassProxy& ClassObj)
             !Prop.IsA<FunctionProxy>() &&
             !Prop.IsA<EnumProxy>() &&
             (!SuperStruct.IsValid() ||
-            (SuperStruct != ClassObj &&
-             Prop.GetOffset() >= SuperStruct.GetPropertiesSize()))) {
+             (SuperStruct != ClassObj && Prop.GetOffset() >= SuperStruct.GetPropertiesSize()))) {
             Props.push_back(Prop);
         }
         Prop = FieldProxy(Prop.GetNext()).Cast<PropertyProxy>();
