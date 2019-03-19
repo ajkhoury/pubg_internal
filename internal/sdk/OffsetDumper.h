@@ -5,9 +5,10 @@
 namespace dumper {
 
 int DumpObjects();
+int DumpStructs();
 
 int DumpNames();
 
-int DumpStructs();
+int DumpWorld();
 
 }

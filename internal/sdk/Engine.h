@@ -112,6 +112,16 @@ protected:
     ElementAllocatorType AllocatorInstance;
     int32_t ArrayNum;
     int32_t ArrayMax;
+
+private:
+    /**
+     * DO NOT USE DIRECTLY
+     * STL-like iterators to enable range-based for loop support.
+     */
+    inline friend ElementType*       begin(TArray& Array) { return Array.GetData(); }
+    inline friend const ElementType* begin(const TArray& Array) { return Array.GetData(); }
+    inline friend ElementType*       end(TArray& Array) { return Array.GetData() + Array.Num(); }
+    inline friend const ElementType* end(const TArray& Array) { return Array.GetData() + Array.Num(); }
 };
 
 class FString {
@@ -134,23 +144,11 @@ public:
     wchar_t *Get() const { return const_cast<wchar_t *>(Data.GetData()); }
 };
 
-struct FNameEncrypted {
-    struct FName GetDecryptedFName() const;
-
-    int32_t IndexEncrypted;
-    int32_t NumberEncrypted;
-};
-
 struct FName {
     FName(int32_t InIndex, int32_t InNumber)
         : Index(InIndex)
         , Number(InNumber)
     {
-    }
-
-    FName(const FNameEncrypted& NameEncryped)
-    {
-        *this = NameEncryped.GetDecryptedFName();
     }
 
     inline int32_t GetIndex() const { return Index; }
@@ -220,22 +218,33 @@ struct FUniqueObjectGuid {
 class FLazyObjectPtr : public TPersistentObjectPtr<FUniqueObjectGuid> {};
 
 struct FScriptDelegate {
-    unsigned char UnknownData[20];
+    uint8_t UnknownData[20];
 };
 
 struct FScriptMulticastDelegate {
-    unsigned char UnknownData[16];
+    uint8_t UnknownData[16];
 };
+
+//class UObject {
+//public:
+//    FPointer VTableObject;                  // 0x00 void**
+//    FNameEncrypted NameEncrypted;           // 0x08 FName       <--- NEEDED
+//    uint64_t InternalIndexEncrypted;        // 0x10 int32_t     <--- NEEDED
+//    uint64_t OuterEncrypted;                // 0x18 UObject*    <--- NEEDED
+//    uint32_t ObjectFlagsEncrypted;          // 0x20 int32_t     <--- NEEDED
+//    uint64_t ClassEncrypted;                // 0x28 UClass*     <--- NEEDED
+//}; // size=0x30
 
 class UObject {
 public:
-    FPointer VTableObject;                  // 0x00 void**
-    FNameEncrypted NameEncrypted;           // 0x08 FName       <--- NEEDED
-    uint64_t InternalIndexEncrypted;        // 0x10 int32_t     <--- NEEDED
-    uint64_t OuterEncrypted;                // 0x18 UObject*    <--- NEEDED
-    uint32_t ObjectFlagsEncrypted;          // 0x20 int32_t     <--- NEEDED
-    uint64_t ClassEncrypted;                // 0x28 UClass*     <--- NEEDED
-}; // size=0x30
+    void **VTable; // 0x0000 (size=0x0008)
+    uint64_t ClassEncrypted; // 0x0008 (size=0x0008)
+    int32_t InternalIndexEncrypted; // 0x0010 (size=0x0004)
+    int32_t NameIndexEncrypted; // 0x0014 (size=0x0004)
+    int32_t NameNumberEncrypted; // 0x0018 (size=0x0004)
+    int32_t ObjectFlagsEncrypted; // 0x001c (size=0x0004)
+    uint64_t OuterEncrypted; // 0x0020 (size=0x0008)
+}; // size=0x0028
 
 class UPackage : public UObject {
 public:
@@ -252,46 +261,48 @@ public:
 
 class UField : public UObject {
 public:
-    UField* Next;                           // 0x30             <--- NEEDED
-}; // size=0x38
+    UField* Next; // 0x0028 (size=0x0008)
+}; // size=0x0030
 
 class UEnum : public UField {
 public:
-    FString CppType;                        // 0x38
-    TArray<TPair<FName, uint64_t>> Names;   // 0x48
-    int64_t CppForm;                        // 0x58 
-}; // size=0x78
+    uint8_t UnknownData0x0030[0x10]; // 0x0030 (size=0x0010)
+    TArray<TPair<FName, int64_t>> Names; // 0x0040 (size=0x0010)
+    uint8_t UnknownData0x0050[0x10]; // 0x0050 (size=0x0010)
+    int32_t CppForm; // 0x0060 (size=0x0004)
+    uint8_t UnknownData0x0064[0xc]; // 0x0064 (size=0x000c)
+}; // size=0x0070
+
+//class UEnum : public UField {
+//public:
+//    FString CppType;                        // 0x38
+//    TArray<TPair<FName, int64_t>> Names;    // 0x48
+//    int64_t CppForm;                        // 0x58
+//    void* EnumDisplayNameFn;                // 0x60
+//}; // size=0x78
 
 class UStruct : public UField {
 public:
-    uint8_t pad_0x0038[0x58];               // 0x38
-    int32_t MinAlignment;                   // 0x90
-    UProperty* DestructorLink;              // 0x98
-    UField* Children;                       // 0xA0             <--- NEEDED
-    TArray<uint8_t> Script;                 // 0xA8
-    class UStruct* SuperStruct;             // 0xB8             <--- NEEDED
-    int32_t PropertiesSize;                 // 0xC0             <--- NEEDED
-    uint64_t padField0;                     // 0xC8
-    TArray<UObject*> ScriptObjectReferences;// 0xD0
-    UProperty* PropertyLink;                // 0xE0
-}; // size=0xE8
+    int32_t PropertiesSize; // 0x0030 (size=0x0004)
+    uint8_t UnknownData0x0034[0x4]; // 0x0034 (size=0x0004)
+    UField* Children; // 0x0038 (size=0x0008)
+    int32_t MinAlignment; // 0x0040 (size=0x0004)
+    uint8_t UnknownData0x0044[0x4]; // 0x0044 (size=0x0004)
+    class UStruct* SuperStruct; // 0x0048 (size=0x0008)
+    uint8_t UnknownData0x0050[0x90]; // 0x0050 (size=0x0090)
+}; // size=0x00e0
 
 class UScriptStruct : public UStruct {
 public:
-    char pad_0x00E8[0x10];                  // 0xE8
-}; // size=0xF8
+    uint8_t pad_0x00E0[0x10];                  // 0xE0
+}; // size=0xF0
 
 class UFunction : public UStruct {
 public:
-    uint16_t ParmsSize;                     // 0xF0
-    UProperty* FirstPropertyToInit;         // 0xF8
-    int32_t FunctionFlags;                  // 0x100            <--- NEEDED
-    int16_t NumParms;                       // 0x108
-    UFunction* EventGraphFunction;          // 0x110
-    int32_t EventGraphCallOffset;           // 0x118
-    void* Func;                             // 0x120
-    uint64_t padField0;                     // 0x128
-}; // size=0x130
+    uint8_t UnknownData0x00e0[0x8]; // 0x00e0 (size=0x0008)
+    int32_t FunctionFlags; // 0x00e8 (size=0x0004)
+    uint8_t UnknownData0x00ec[0x3c]; // 0x00ec (size=0x003c)
+}; // size=0x0128
 
 class FClassBaseChain {
 public:
@@ -306,17 +317,13 @@ public:
 
 class UProperty : public UField {
 public:
-    int32_t ArrayDim;                       // 0x38             <--- NEEDED
-    int32_t ElementSize;                    // 0x3C             <--- NEEDED
-    uint64_t PropertyFlags;                 // 0x40             <--- NEEDED
-    uint64_t padField0;                     // 0x48
-    uint64_t padField1;                     // 0x50
-    int32_t Offset_Internal;                // 0x58             <--- NEEDED
-    UProperty *PropertyLinkNext;            // 0x60
-    UProperty *NextRef;                     // 0x68
-    UProperty *DestructorLinkNext;          // 0x70
-    UProperty *PostConstructLinkNext;       // 0x78
-}; // size=0x80
+    int32_t ArrayDim; // 0x0030 (size=0x0004)
+    int32_t ElementSize; // 0x0034 (size=0x0004)
+    uint64_t PropertyFlags; // 0x0038 (size=0x0008)
+    uint8_t UnknownData0x0040[0x10]; // 0x0040 (size=0x0010)
+    int32_t Offset_Internal; // 0x0050 (size=0x0004)
+    uint8_t UnknownData0x0054[0x24]; // 0x0054 (size=0x0024)
+}; // size=0x0078
 
 class UNumericProperty : public UProperty {
 public:
@@ -324,7 +331,7 @@ public:
 
 class UByteProperty : public UNumericProperty {
 public:
-    UEnum *Enum;                            // 0x80             <--- NEEDED
+    UEnum *Enum;
 };
 
 class UUInt16Property : public UNumericProperty {
@@ -373,12 +380,12 @@ public:
 
 class UInterfaceProperty : public UProperty {
 public:
-    UClass* InterfaceClass;                 // 0x80
+    UClass* InterfaceClass;
 };
 
 class UObjectPropertyBase : public UProperty {
 public:
-    UClass* PropertyClass;                  // 0x80
+    UClass* PropertyClass;
 };
 
 class UObjectProperty : public UObjectPropertyBase {
@@ -387,7 +394,7 @@ public:
 
 class UClassProperty : public UObjectProperty {
 public:
-    UClass* MetaClass;                      // 0x88
+    UClass* MetaClass;
 };
 
 class UWeakObjectProperty : public UObjectPropertyBase {
@@ -404,7 +411,7 @@ public:
 
 class UAssetClassProperty : public UAssetObjectProperty {
 public:
-    UClass* MetaClass;                      // 0x88
+    UClass* MetaClass;
 };
 
 class UNameProperty : public UProperty {
@@ -413,7 +420,7 @@ public:
 
 class UStructProperty : public UProperty {
 public:
-    UScriptStruct* Struct;                  // 0x80
+    UScriptStruct* Struct;
 };
 
 class UStrProperty : public UProperty {
@@ -426,32 +433,32 @@ public:
 
 class UArrayProperty : public UProperty {
 public:
-    UProperty* Inner;                       // 0x80
+    UProperty* Inner;
 };
 
 class UMapProperty : public UProperty {
 public:
-    UProperty* KeyProp;                     // 0x80
-    UProperty* ValueProp;                   // 0x88
+    UProperty* KeyProp;
+    UProperty* ValueProp;
 };
 
 class UDelegateProperty : public UProperty {
 public:
-    UFunction* SignatureFunction;           // 0x80
+    UFunction* SignatureFunction;
 };
 
 class UMulticastDelegateProperty : public UProperty {
 public:
-    UFunction* SignatureFunction;           // 0x80
+    UFunction* SignatureFunction;
 };
 
 class UEnumProperty : public UProperty {
 public:
-    class UNumericProperty* UnderlyingProp; // 0x80
-    class UEnum* Enum;                      // 0x88
-}; // size=0x90
+    class UNumericProperty* UnderlyingProp;
+    class UEnum* Enum;
+};
 
 struct FKey {
-    struct FName  KeyName;                  // 0x00
-    uint8_t UnknownData00[16];              // 0x08
+    struct FName KeyName;
+    uint8_t UnknownData0x0008[16];
 };

@@ -87,7 +87,14 @@ struct GeneratorClass : GeneratorScriptStruct {
 
 
 class GeneratorPackage {
+
+    friend struct std::hash<GeneratorPackage>;
+    friend bool operator==(const GeneratorPackage& lhs, const GeneratorPackage& rhs);
+    friend struct GeneratorPackageDependencyComparer;
+
 public:
+    static std::unordered_map<const UPackage*, const GeneratorPackage*> PackageMap;
+
     GeneratorPackage(const UPackage* PackageObj)
         : PackageObject(const_cast<UPackage*>(PackageObj))
     {
@@ -96,6 +103,7 @@ public:
     inline GeneratorPackage& operator=(const UPackage* InPackage) { PackageObject = const_cast<UPackage*>(InPackage); return *this; }
     inline GeneratorPackage& operator=(const GeneratorPackage& InPackage) { PackageObject = InPackage.PackageObject; return *this; }
 
+    //inline operator const UPackage*() const { return PackageObject; }
     inline UPackage* GetPackageObject() const { return PackageObject; }
     inline std::string GetName() const { return ObjectProxy(PackageObject).GetName(); }
 
@@ -180,3 +188,42 @@ inline bool operator!=(const GeneratorPackage& lhs, const GeneratorPackage& rhs)
 {
     return !(lhs == rhs);
 }
+
+struct GeneratorPackageDependencyComparer {
+    bool operator()(const std::unique_ptr<GeneratorPackage>& lhs,
+                    const std::unique_ptr<GeneratorPackage>& rhs) const
+    {
+        return operator()(*lhs, *rhs);
+    }
+
+    bool operator()(const GeneratorPackage* lhs, const GeneratorPackage* rhs) const
+    {
+        return operator()(*lhs, *rhs);
+    }
+
+    bool operator()(const GeneratorPackage& lhs, const GeneratorPackage& rhs) const
+    {
+        if (rhs.DependencyObjects.empty()) {
+            return false;
+        }
+
+        if (std::find(std::begin(rhs.DependencyObjects),
+                      std::end(rhs.DependencyObjects),
+                      lhs.PackageObject) != std::end(rhs.DependencyObjects)) {
+            return true;
+        }
+
+        for (const auto dep : rhs.DependencyObjects) {
+            const auto Package = GeneratorPackage::PackageMap[dep];
+            if (Package == nullptr) {
+                continue; // Missing package, should not occur...
+            }
+
+            if (operator()(lhs, *Package)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+};

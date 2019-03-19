@@ -3,6 +3,8 @@
 #include "Engine.h"
 #include "Names.h"
 
+#include <native/log.h>
+
 #include <unordered_map>
 #include <type_traits>
 
@@ -18,6 +20,44 @@
 
 #define DEFINE_STATIC_CLASS(TClass) \
     const UClass* TClass##Proxy::TClass##Class = nullptr
+
+class FUObjectItem {
+public:
+    UObject *Object; // 0x00
+    int32_t Flags; // 0x08
+    int32_t ClusterIndex; // 0x0C
+    int32_t SerialNumber; // 0x10
+}; // size=0x18
+
+//class ObjectIterator {
+//public:
+//    ObjectIterator(const int32_t InObjectIndex) : Index(InObjectIndex) {}
+//    ObjectIterator(const ObjectIterator& Other) : Index(Other.Index) {}
+//    ObjectIterator(ObjectIterator&& Other) noexcept : Index(Other.Index) {}
+//
+//    inline ObjectIterator& operator=(const ObjectIterator& rhs)
+//    {
+//        Index = rhs.Index;
+//        return *this;
+//    }
+//
+//    inline void swap(ObjectIterator& Other) noexcept
+//    {
+//        std::swap(Index, Other.Index);
+//    }
+//
+//    inline bool operator==(const ObjectIterator& rhs) const { return Index == rhs.Index; }
+//    inline bool operator!=(const ObjectIterator& rhs) const { return Index != rhs.Index; }
+//
+//    inline ObjectIterator& operator++() { ++Index; return *this; }
+//    inline ObjectIterator operator++(int) { auto tmp(*this); ++(*this); return tmp; }
+//
+//    class ObjectProxy operator*() const;
+//    class ObjectProxy operator->() const;
+//
+//private:
+//    int32_t Index;
+//};
 
 class ObjectsProxy {
 public:
@@ -38,6 +78,17 @@ public:
     inline const UClass* FindClass(const std::string& name) const { return FindObject<UClass>(name); }
 
 private:
+    FUObjectItem *GetObjectsPrivate() const;
+
+    /**
+     * DO NOT USE DIRECTLY
+     * STL-like iterators to enable range-based for loop support.
+     */
+    //inline friend ObjectIterator begin(ObjectsProxy& Objects) { return ObjectIterator(0); }
+    //inline friend const ObjectIterator begin(const ObjectsProxy& Objects) { return ObjectIterator(0); }
+    //inline friend ObjectIterator end(ObjectsProxy& Objects) { return ObjectIterator(Objects.GetNum()); }
+    //inline friend const ObjectIterator end(const ObjectsProxy& Objects) { return ObjectIterator(Objects.GetNum()); }
+
     void *ObjectArray;
 };
 
@@ -53,20 +104,12 @@ public:
     {
     }
 
-    inline UObject* operator->() { return Object; }
-    inline const UObject* operator->() const { return Object; }
-
-    inline UObject& operator*() { return *Object; }
-    inline const UObject& operator*() const { return *Object; }
-
     inline ObjectProxy& operator=(UObject* InObject) { Object = InObject; return *this; }
     inline ObjectProxy& operator=(const ObjectProxy& InProxy) { Object = InProxy.Object; return *this; }
 
-    inline operator UObject*() const { return Object; }
-
     inline const UObject* GetReference() const { return const_cast<const UObject*>(Object); }
     inline void *GetAddress() const { return (void *)Object; }
-    inline bool IsValid() const { return GetAddress() != nullptr; }
+    inline bool IsValid() const { return Object != nullptr; }
 
     int32_t GetFlags() const;
     uint32_t GetUniqueId() const;
@@ -116,6 +159,13 @@ public:
 
         return false;
     }
+
+    inline operator UObject*() const { return Object; }
+
+    inline UObject* operator->() { return Object; }
+    inline const UObject* operator->() const { return Object; }
+    inline UObject& operator*() { return *Object; }
+    inline const UObject& operator*() const { return *Object; }
 
     DECLARE_STATIC_CLASS(Object);
 
@@ -204,11 +254,17 @@ public:
     {
         NamesProxy Names;
         std::vector<std::string> StringArray;
-        const TArray<TPair<FName, uint64_t>>& NamesArray = static_cast<const UEnum*>(GetReference())->Names;
+        const TArray<TPair<FName, int64_t>>& NamesArray = Get<UEnum>()->Names;
 
-        for (int32_t i = 0; i < NamesArray.Num(); ++i) {
-            StringArray.push_back(Names.GetById(NamesArray[i].Key.GetIndex()));
+        //LOG_INFO("MADEIT1 - NamesArray.Num = %d", NamesArray.Num());
+
+        for (auto Name : NamesArray) {
+            int32_t Index = Name.Key.GetIndex();
+            //LOG_INFO("MADEIT2 - NamesArray[%d].Key.GetIndex() = %d", i, Index);
+            StringArray.push_back(Names.GetById(Index));
         }
+
+        //LOG_INFO("MADEIT3");
 
         return StringArray;
     }

@@ -2,30 +2,30 @@
 
 #include "Objects.h"
 
-static std::string MakeValidName(std::string&& name)
+static std::string MakeValidName(std::string&& Name)
 {
-    std::string ValidString(name);
+    std::string ValidString(Name);
 
-    for (size_t i = 0; i < name.length(); ++i) {
-        if (ValidString[i] == ' '
-            || ValidString[i] == '?'
-            || ValidString[i] == '+'
-            || ValidString[i] == '-'
-            || ValidString[i] == ':'
-            || ValidString[i] == '/'
-            || ValidString[i] == '^'
-            || ValidString[i] == '('
-            || ValidString[i] == ')'
-            || ValidString[i] == '['
-            || ValidString[i] == ']'
-            || ValidString[i] == '<'
-            || ValidString[i] == '>'
-            || ValidString[i] == '&'
-            || ValidString[i] == '.'
-            || ValidString[i] == '#'
-            || ValidString[i] == '\''
-            || ValidString[i] == '"'
-            || ValidString[i] == '%') {
+    for (size_t i = 0; i < Name.length(); ++i) {
+        if (ValidString[i] == ' ' ||
+            ValidString[i] == '?' ||
+            ValidString[i] == '+' ||
+            ValidString[i] == '-' ||
+            ValidString[i] == ':' ||
+            ValidString[i] == '/' ||
+            ValidString[i] == '^' ||
+            ValidString[i] == '(' ||
+            ValidString[i] == ')' ||
+            ValidString[i] == '[' ||
+            ValidString[i] == ']' ||
+            ValidString[i] == '<' ||
+            ValidString[i] == '>' ||
+            ValidString[i] == '&' ||
+            ValidString[i] == '.' ||
+            ValidString[i] == '#' ||
+            ValidString[i] == '\'' ||
+            ValidString[i] == '"' ||
+            ValidString[i] == '%') {
             ValidString[i] = '_';
         }
     }

@@ -95,6 +95,14 @@ static size_t StructSuperStructOffset = -1;
 
 static size_t FunctionFlagsOffset = -1;
 
+static size_t PropertyElementSizeOffset = -1;
+static size_t PropertyArrayDimOffset = -1;
+static size_t PropertyOffset_InternalOffset = -1;
+static size_t PropertyFlagsOffset = -1;
+
+static size_t EnumNamesOffset = -1;
+static size_t EnumCppFormOffset = -1;
+
 int DumpObjects()
 {
     int rc;
@@ -115,7 +123,7 @@ int DumpObjects()
     Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("F0 4D 0F B1 24 0F"));
     if (!Found) {
         LOG_ERROR(_XOR_("Failed to find FUObjectArray::FreeUObjectIndex signature!"));
-        return STATUS_NOT_FOUND;
+        return ERROR_NOT_FOUND;
     }
     rc = utils::FindFunctionStartFromPtr(Found, PAGE_SIZE, &Found);
     if (rc < 0) {
@@ -266,7 +274,7 @@ int DumpObjects()
 
 
     // UObjectBaseUtility::MarkPackageDirty
-    // E8 ? ? ? ? 4C 63 63 40
+    // E8 ? ? ? ? 4C 63 63 ? 4C 63 73
     //const uint8_t MarkPackageDirty[] = {
     //    0xE8, 0xCC, 0xCC, 0xCC, 0xCC,               /* call    UObjectBaseUtility__MarkPackageDirty */
     //                                                /* loc_7FF7F13FBCF4: */
@@ -279,7 +287,7 @@ int DumpObjects()
         Found = static_cast<const uint8_t *>(utils::GetCallTargetAddress(Found));
     if (!Found) {
         LOG_ERROR(_XOR_("Failed to find UObjectBaseUtility::MarkPackageDirty!"));
-        return STATUS_NOT_FOUND;
+        return ERROR_NOT_FOUND;
     }
 
     // Disassemble the UObjectBaseUtility::MarkPackageDirty routine.
@@ -311,40 +319,47 @@ int DumpObjects()
 
         // Search for the beginning of the ObjectFlagsEncrypted decryption, which
         // is near the beginning within the first 6 instructions.
-        /* mov     ebx, [rcx+20h] ; Object->ObjectFlagsEncrypted */
+        /* mov     ebx, [rcx+20h] ; this->ObjectFlagsEncrypted */
         if (InstIndex < 6 &&
             Inst->opcode == I_MOV &&
             Inst->ops[0].type == O_REG &&
             Inst->ops[1].type == O_SMEM) {
 
+            // We found the UObject::ObjectFlagsEncrypted offset!
             ObjectFlagsEncryptedOffset = static_cast<size_t>(Inst->disp);
-            ObjectFlagsEncryptedRegister = Inst->ops[1].index;
+            ObjectFlagsEncryptedRegister = Inst->ops[0].index;
 
             // Increment next instruction.
             INCREMENT_NEXT_INSTRUCTION();
             // Shave off any decryption fuckery nop calls.
             SKIP_FUCKERY_NOP_CALLS();
 
+            // We found the beginning of the UObject::ObjectFlagsEncrypted decryption.
             ObjectFlagsDecryptionBegin = NextIp;
+            // Search for the ending of the UObject::ObjectFlagsEncrypted inline decryption.
+            DisData* PrevInst = NextInst;
+            uint8_t* PrevIp = NextIp;
+            while (!(PrevInst->opcode == I_SHR &&
+                     NextInst->opcode == I_TEST)) {
+                PrevInst = NextInst;
+                PrevIp = NextIp;
+                INCREMENT_NEXT_INSTRUCTION();
+            }
+            // We found the ending of the UObject::ObjectFlagsEncrypted inline encryption.
+            ObjectFlagsDecryptionEnd = PrevIp;
+
+            // Handle the next instruction.
             goto Next2;
         }
 
-        // Search for the end of the ObjectFlagsEncrypted decryption.
-        if (ObjectFlagsDecryptionBegin && !ObjectFlagsDecryptionEnd) {
-            /* shr     ebx, 6 */
-            if (Inst->opcode == I_SHR && NextInst->opcode == I_TEST) {
-                // We found the ending of the ObjectFlagsEncrypted decryption!
-                ObjectFlagsDecryptionEnd = Ip;
+        // The first call instruction is a call to the UObjectBaseUtility::GetOutermost routine.
+        if (Inst->opcode == I_CALL && Inst->ops[0].type == O_PC) {
 
-                // The next call is a call to the UObjectBaseUtility::GetOutermost routine.
-                while (NextInst->opcode != I_CALL) {
-                    INCREMENT_NEXT_INSTRUCTION();
-                }
-                TargetAddress = INSTRUCTION_GET_TARGET(NextInst);
+            // Get the address of the UObjectBaseUtility::GetOutermost routine.
+            TargetAddress = INSTRUCTION_GET_TARGET(NextInst);
 
-                // We're done!
-                break;
-            }
+            // We're done!
+            break;
         }
 
     Next2:
@@ -355,9 +370,10 @@ int DumpObjects()
         InstIndex = static_cast<uint32_t>(NextInst - Insts);
     }
 
+    // Check if we found the UObjectBaseUtility::GetOutermost routine address.
     if (!TargetAddress) {
         LOG_ERROR(_XOR_("Failed to find UObjectBaseUtility::GetOutermost!"));
-        return STATUS_NOT_FOUND;
+        return ERROR_NOT_FOUND;
     }
     // Set the Found address to UObjectBaseUtility::GetOutermost.
     Found = reinterpret_cast<const uint8_t *>(TargetAddress);
@@ -397,30 +413,30 @@ int DumpObjects()
             Inst->ops[0].type == O_REG &&
             Inst->ops[1].type == O_SMEM) {
 
+            // We found the UObject::OuterEncrypted offset!
             ObjectOuterEncryptedOffset = static_cast<size_t>(Inst->disp);
-            ObjectOuterEncryptedRegister = Inst->ops[1].index;
+            ObjectOuterEncryptedRegister = Inst->ops[0].index;
 
             // Increment next instruction.
             INCREMENT_NEXT_INSTRUCTION();
             // Shave off any decryption fuckery nop calls.
             SKIP_FUCKERY_NOP_CALLS();
 
+            // We found the beginning of the UObject::OuterEncrypted inline decryption.
             ObjectOuterDecryptionBegin = NextIp;
-            goto Next3;
-        }
-
-        // Search for the end of the NameEncrypted decryption.
-        if (ObjectOuterDecryptionBegin && !ObjectOuterDecryptionEnd) {
-            /* xor     rax, rbx
-             * jz      short loc_7FF785419960
-             */
-            if (Inst->opcode == I_JZ) {
-                ObjectOuterDecryptionEnd = Ip;
-                break;
+            // Search for the end of the UObject::OuterEncrypted inline decryption.
+            INCREMENT_NEXT_INSTRUCTION();
+            while (META_GET_FC(NextInst->meta) != FC_CND_BRANCH) {
+                INCREMENT_NEXT_INSTRUCTION();
             }
+            // We found the ending of the UObject::OuterEncrypted inline decryption.
+            ObjectOuterDecryptionEnd = NextIp;
+
+            // We are done!
+            break;
         }
 
-    Next3:
+//  Next3:
         // Increment to the next instruction.
         Inst = NextInst;
         Ip = NextIp;
@@ -471,7 +487,7 @@ int DumpObjects()
     Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("BA 80 00 00 00 E8 ?? ?? ?? ?? 48 8B 7D"));
     if (!Found) {
         LOG_ERROR(_XOR_("Failed to find UObjectBaseUtility::GetFullName signature!"));
-        return STATUS_NOT_FOUND;
+        return ERROR_NOT_FOUND;
     }
 
     // Disassemble the UObjectBaseUtility::GetFullName routine.
@@ -652,7 +668,7 @@ int DumpObjects()
     Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("48 85 C9 0F 84 ?? ?? ?? ?? 8B 41 0C 41 89"));
     if (!Found) {
         LOG_ERROR(_XOR_("Failed to find Link signature!"));
-        return STATUS_NOT_FOUND;
+        return ERROR_NOT_FOUND;
     }
 
     // Disassemble the UStruct::Link routine.
@@ -752,7 +768,7 @@ int DumpObjects()
     }
     if (!Found) {
         LOG_ERROR(_XOR_("Failed to find UClass::CreateDefaultObject signature!"));
-        return STATUS_NOT_FOUND;
+        return ERROR_NOT_FOUND;
     }
     LOG_INFO(_XOR_("Found the UClass::CreateDefaultObject signature: 0x%p"), Found);
     // Disassemble the instruction.
@@ -765,7 +781,7 @@ int DumpObjects()
 
     } else {
         LOG_ERROR(_XOR_("Failed to disassemble UClass::CreateDefaultObject instruction!"));
-        return STATUS_ILLEGAL_INSTRUCTION;
+        return RtlNtStatusToDosError(STATUS_ILLEGAL_INSTRUCTION);
     }
 
     // Search for the following sequence inside of UObject::ProcessEvent:
@@ -776,7 +792,7 @@ int DumpObjects()
     Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("F7 86 ?? ?? ?? ?? 00 00 40 00 74"));
     if (!Found) {
         LOG_ERROR(_XOR_("Failed to find UObject::ProcessEvent signature!"));
-        return STATUS_NOT_FOUND;
+        return ERROR_NOT_FOUND;
     }
     LOG_INFO(_XOR_("Found the UObject::ProcessEvent signature: 0x%p"), Found);
 
@@ -790,7 +806,7 @@ int DumpObjects()
 
     } else {
         LOG_ERROR(_XOR_("Failed to disassemble UObject::ProcessEvent instruction!"));
-        return STATUS_ILLEGAL_INSTRUCTION;
+        return RtlNtStatusToDosError(STATUS_ILLEGAL_INSTRUCTION);
     }
 
     // Output the hueristic search results.
@@ -811,7 +827,589 @@ int DumpObjects()
     }
 
 
+    // Search for sequence of instructions inside of UProperty::SetupOffset:
+    // .text:7FF7F1E22334 FF C8         dec     eax
+    // .text:7FF7F1E22336 F7 D0         not     eax
+    // .text:7FF7F1E22338 23 C8         and     ecx, eax
+    // .text:7FF7F1E2233A 8B 47 3C      mov     eax, [rdi+3Ch]  ; _EAX = this->ElementSize
+    // .text:7FF7F1E2233D 0F AF 47 38   imul    eax, [rdi+38h]  ; _EAX = this->ArrayDim * this->ElementSize
+    // .text:7FF7F1E22341 89 4F 58      mov     [rdi+58h], ecx  ; this->Offset_Internal = NewOffset
+    // .text:7FF7F1E22344 03 C1         add     eax, ecx        ; return NewOffset + Size
+    // 8B 47 ? 0F AF 47 ? 89 4F ?
+    Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("8B 47 ?? 0F AF 47 ?? 89 4F"));
+    if (!Found) {
+        LOG_ERROR(_XOR_("Failed to find UProperty::SetupOffset signature!"));
+        return ERROR_NOT_FOUND;
+    }
+    // Disassemble the UProperty::SetupOffset instructions.
+    rc = DisDecompose(Found,
+                      MAX_DISASM_LENGTH,
+                      (uint64_t)Found,
+                      Insts,
+                      MAX_INSTRUCTION_COUNT,
+                      &InstCount,
+                      NULL,
+                      DISASM_X64
+                      );
+    if (rc != DIS_SUCCESS) {
+        LOG_ERROR(_XOR_("Failed to disassemble UProperty::SetupOffset code!"));
+        return rc;
+    }
+
+    // Get the offsets.
+    if (InstCount >= 3) {
+
+        PropertyElementSizeOffset = Insts[0].disp;
+        PropertyArrayDimOffset = Insts[1].disp;
+        PropertyOffset_InternalOffset = Insts[2].disp;
+
+    } else {
+        LOG_ERROR(_XOR_("Failed to find UProperty offsets inside UProperty::SetupOffset!"));
+    }
+
+    // Search for sequence of instructions inside of UEnumProperty::LinkInternal:
+    // .text:7FF7F210777B 48 8B CB                      mov     rcx, rbx                ; this
+    // .text:7FF7F210777E E8 CD AA D1 FF                call    UProperty__SetupOffset  
+    // .text:7FF7F210777E
+    // .text:7FF7F2107783 48 8B 96 80 00 00 00          mov     rdx, [rsi+80h]          ; _RDX = this->UnderlyingProp
+    // .text:7FF7F210778A 48 B9 00 00 00 00 00 00 08 00 mov     rcx, 8000000000000h     ; _RCX = 0x8000000000000
+    // .text:7FF7F2107794 48 8B 5C 24 30                mov     rbx, [rsp+30h]
+    // .text:7FF7F2107799 8B 42 3C                      mov     eax, [rdx+3Ch]          ; _EAX = UnderlyingProp->ElementSize
+    // .text:7FF7F210779C 89 46 3C                      mov     [rsi+3Ch], eax          ; this->ElementSize = _EAX
+    // .text:7FF7F210779F 48 B8 00 02 00 40 10 00 00 00 mov     rax, 1040000200h        ; _RAX = 0x1040000200
+    // .text:7FF7F21077A9 48 09 46 40                   or      [rsi+40h], rax          ; this->PropertyFlags |= 0x1040000200
+    // .text:7FF7F21077AD 48 8B 42 40                   mov     rax, [rdx+40h]          ; _RAX = UnderlyingProp->PropertyFlags
+    // .text:7FF7F21077B1 48 23 C1                      and     rax, rcx                ; _RAX &= 0x8000000000000
+    // .text:7FF7F21077B4 48 09 46 40                   or      [rsi+40h], rax          ; this->PropertyFlags |= UnderlyingProp->PropertyFlags & 0x8000000000000
+    // 48 B8 00 02 00 40 10 00 00 00 48 09 46 ? 48 8B 42 ? 48 23 C1
+    Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("48 B8 00 02 00 40 10 00 00 00 48 09 46 ?? 48 8B 42"));
+    if (!Found) {
+        LOG_ERROR(_XOR_("Failed to find UEnumProperty::LinkInternal signature!"));
+        return ERROR_NOT_FOUND;
+    }
+    // Disassemble the UEnumProperty::LinkInternal instruction.
+    Inst = Insts;
+    if (!DisInstruction(Found + 10, Inst, DISASM_X64)) {
+        LOG_ERROR(_XOR_("Failed to disassemble UEnumProperty::LinkInternal instruction!"));
+        return rc;
+    }
+    // Get the offset.
+    if (Inst->opcode == I_OR && Inst->dispOffset > 0) {
+        PropertyFlagsOffset = Inst->disp;
+    }
+
+    // Output the search results.
+    if (PropertyElementSizeOffset != -1) {
+        LOG_INFO(_XOR_("UProperty::ElementSize offset = 0x%08x"), PropertyElementSizeOffset);
+    }
+    if (PropertyArrayDimOffset != -1) {
+        LOG_INFO(_XOR_("UProperty::ArrayDim offset = 0x%08x"), PropertyArrayDimOffset);
+    }
+    if (PropertyOffset_InternalOffset != -1) {
+        LOG_INFO(_XOR_("UProperty::Offset_Internal offset = 0x%08x"), PropertyOffset_InternalOffset);
+    }
+    if (PropertyFlagsOffset != -1) {
+        LOG_INFO(_XOR_("UProperty::PropertyFlags offset = 0x%08x"), PropertyFlagsOffset);
+    }
+
+
+
+    // Search for the UEnum::CppForm instruction inside of UEnum::SetEnums.
+    // .text:7FF7F21BE776 44 89 7B 68   mov     [rbx+68h], r15d ; this->CppForm = InCppForm
+    // .text:7FF7F21BE77A 45 84 F6      test    r14b, r14b
+    // 44 89 7B ? 45 84 F6
+    Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("44 89 7B ?? 45 84 F6"));
+    if (!Found) {
+        LOG_ERROR(_XOR_("Failed to find UEnum::SetEnums signature!"));
+        return ERROR_NOT_FOUND;
+    }
+    // Get the function start address.
+    rc = utils::FindFunctionStartFromPtr(Found, 1024, &Found);
+    if (rc < 0) {
+        LOG_ERROR(_XOR_("Failed to backtrack to beginning of UEnum::SetEnums!"));
+        return rc;
+    }
+
+    // Disassemble the UEnum::SetEnums instruction.
+    rc = DisDecompose(Found,
+                      MAX_DISASM_LENGTH,
+                      (uint64_t)Found,
+                      Insts,
+                      MAX_INSTRUCTION_COUNT,
+                      &InstCount,
+                      NULL,
+                      DISASM_X64
+                      );
+    if (rc != DIS_SUCCESS) {
+        LOG_ERROR(_XOR_("Failed to disassemble UEnum::SetEnums code!"));
+        return rc;
+    }
+
+    // Heuristically search for offsets.
+    Ip = const_cast<uint8_t *>(Found);
+    TargetAddress = 0;
+    Offset = 0;
+    InstIndex = 0;
+    Inst = Insts;
+    InstEnd = Insts + InstCount;
+    while (Inst < InstEnd) {
+        NextInst = Inst + 1;
+        NextIp = Ip + Inst->size;
+        NextOffset = Offset + Inst->size;
+
+        // Search for the UEnum::Names field offset.
+        if (Inst->opcode == I_LEA && NextInst->opcode == I_CMP) {
+            EnumNamesOffset = static_cast<size_t>(Inst->disp);
+            goto Next7;
+        }
+        // Search for the UEnum::CppForm field offset.
+        if (Inst->opcode == I_MOV && 
+            Inst->ops[0].type == O_SMEM &&
+            Inst->ops[0].index == R_RBX &&
+            NextInst->opcode == I_TEST) {
+            EnumCppFormOffset = static_cast<size_t>(Inst->disp);
+            // We are done!
+            break;
+        }
+
+    Next7:
+        // Increment to the next instruction.
+        Inst = NextInst;
+        Ip = NextIp;
+        Offset = NextOffset;
+        InstIndex = static_cast<uint32_t>(NextInst - Insts);
+    }
+
+    // Output the search results.
+    if (EnumNamesOffset != -1) {
+        LOG_INFO(_XOR_("UEnum::Names offset = 0x%08x"), EnumNamesOffset);
+    }
+    if (EnumCppFormOffset != -1) {
+        LOG_INFO(_XOR_("UEnum::CppForm offset = 0x%08x"), EnumCppFormOffset);
+    }
+
+
+
+
     return rc;
+}
+
+typedef std::map<std::wstring, size_t> UnrealObjectSizeMapType;
+UnrealObjectSizeMapType UnrealObjectSizeMap;
+
+static int InitializeUnrealObjectSizeMap()
+{
+    void* ImageBase = utils::GetModuleHandleWIDE(nullptr /*0xC4D8736D TslGame.exe */);
+    uint32_t ImageSize = utils::GetModuleSize((HMODULE)ImageBase);
+    const uint8_t* SearchEnd = static_cast<uint8_t*>(ImageBase) + ImageSize;
+    uint8_t* SearchBase;
+    size_t SearchSize;
+    const uint8_t *FoundNext;
+    UnrealObjectSizeMapType::iterator UnrealObjectSizeIter;
+
+    // Construct a map of Unreal object sizes using the AutoInitialize instrinsic stubs.
+    // UStruct__AutoInit proc near
+    // .text:7FF7F0277820 45 33 C9              xor     r9d, r9d
+    // .text:7FF7F0277823 48 8D 15 AE CF 19 04  lea     rdx, aUstruct       ; "UStruct"
+    // .text:7FF7F027782A 41 B8 E0 00 00 00     mov     r8d, 0E0h
+    // .text:7FF7F0277830 48 8D 0D 39 A6 99 05  lea     rcx, off_7FF7F5C11E70
+    // .text:7FF7F0277837 E9 44 08 6E 01        jmp     sub_7FF7F1958080
+    // UStruct__AutoInit endp
+    // 45 33 C9 48 8D 15 ? ? ? ? 41 B8 ? ? ? ? 48 8D 0D ? ? ? ? E9 ? ? ? ?
+    FoundNext = static_cast<uint8_t*>(ImageBase);
+    while (1) {
+
+        // Set the search base and size for this iteration.
+        SearchBase = const_cast<uint8_t*>(FoundNext) + 1;
+        SearchSize = static_cast<size_t>(SearchEnd - SearchBase);
+        // Do the pattern scan for the next match.
+        FoundNext = utils::FindPatternIDA(SearchBase,
+                                          SearchSize,
+                                          _XOR_("45 33 C9 48 8D 15 ?? ?? ?? ?? 41 B8"));
+        if (!FoundNext) {
+            break;
+        }
+
+        // Seek to the LEA instruction that passes the Unreal object name.
+        FoundNext += 3;
+        // Get the name of the Unreal object from the address passed into RDX.
+        std::wstring ObjectName = static_cast<wchar_t*>(utils::GetInstructionTarget(FoundNext, 3));
+
+        // Seek to the MOV instruction that passes the Unreal object size.
+        FoundNext += 7;
+        // Get the Unreal object size from the instruction immediate operand.
+        size_t ObjectSize = static_cast<size_t>(utils::GetInstructionImm32(FoundNext, 2));
+
+        // Insert this Unreal object size into the map.
+        UnrealObjectSizeMap[ObjectName] = ObjectSize;
+    }
+
+    // The second variation that uses an LEA instruction with the size.
+    // .text:7FF7F02777C0                       UField__AutoInit proc near
+    // .text:7FF7F02777C0 45 33 C9              xor     r9d, r9d
+    // .text:7FF7F02777C3 48 8D 15 5E FA 19 04  lea     rdx, aUfield        ; "UField"
+    // .text:7FF7F02777CA 48 8D 0D 77 A6 99 05  lea     rcx, off_7FF7F5C11E48
+    // .text:7FF7F02777D1 45 8D 41 38           lea     r8d, [r9+38h]
+    // .text:7FF7F02777D5 E9 A6 08 6E 01        jmp     sub_7FF7F1958080
+    // .text:7FF7F02777D5                       UField__AutoInit endp
+    // 45 33 C9 48 8D 15 ? ? ? ? 48 8D 0D ? ? ? ? 45 8D 41 ? E9 ? ? ? ?
+    FoundNext = static_cast<uint8_t*>(ImageBase);
+    while (1) {
+
+        // Set the search base and size for this iteration.
+        SearchBase = const_cast<uint8_t*>(FoundNext) + 1;
+        SearchSize = static_cast<size_t>(SearchEnd - SearchBase);
+        // Do the pattern scan for the next match.
+        FoundNext = utils::FindPatternIDA(SearchBase,
+                                          SearchSize,
+                                          _XOR_("45 33 C9 48 8D 15 ?? ?? ?? ?? 48 8D 0D"));
+        if (!FoundNext) {
+            break;
+        }
+
+        // Seek to the LEA instruction that passes the Unreal object name.
+        FoundNext += 3;
+        // Get the name of the Unreal object from the address passed into RDX.
+        std::wstring ObjectName = static_cast<wchar_t*>(utils::GetInstructionTarget(FoundNext, 3));
+
+        // Seek to the LEA instruction that passes the Unreal object size.
+        FoundNext += 14;
+        // Get the Unreal object size from the instruction memory operand.
+        size_t ObjectSize = static_cast<size_t>(utils::GetInstructionImm8(FoundNext, 3));
+
+        // Insert this Unreal object size into the map.
+        UnrealObjectSizeMap[ObjectName] = ObjectSize;
+    }
+
+    // The third variation that UObject uses, which looks like this:
+    // .text:7FF7F0370B80                       UObject__AutoInit proc near
+    // .text:7FF7F0370B80 48 83 EC 28           sub     rsp, 28h
+    // .text:7FF7F0370B84 41 B9 B7 75 77 A1     mov     r9d, 0A17775B7h
+    // .text:7FF7F0370B8A 41 B8 30 00 00 00     mov     r8d, 30h ; '0'
+    // .text:7FF7F0370B90 48 8D 15 99 8C A2 04  lea     rdx, aUobject_0     ; "UObject"
+    // .text:7FF7F0370B97 48 8D 0D EA 24 F8 05  lea     rcx, off_7FF7F62F3088
+    // .text:7FF7F0370B9E E8 DD AC 81 02        call    sub_7FF7F2B8B880
+    // .text:7FF7F0370BA3 48 83 C4 28           add     rsp, 28h
+    // .text:7FF7F0370BA7 C3                    retn
+    // .text:7FF7F0370BA7                       UObject__AutoInit endp
+    // 48 83 EC 28 41 B9 ? ? ? ? 41 B8 ? ? ? ? 48 8D 15 ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ?
+    FoundNext = static_cast<uint8_t*>(ImageBase);
+    while (1) {
+
+        // Set the search base and size for this iteration.
+        SearchBase = const_cast<uint8_t*>(FoundNext) + 1;
+        SearchSize = static_cast<size_t>(SearchEnd - SearchBase);
+        // Do the pattern scan for the next match.
+        FoundNext = utils::FindPatternIDA(
+                            SearchBase,
+                            SearchSize,
+                            _XOR_("48 83 EC 28 41 B9 ?? ?? ?? ?? 41 B8 ?? ?? ?? ?? 48 8D 15"));
+        if (!FoundNext) {
+            break;
+        }
+
+        // Seek to the MOV instruction that passes the Unreal object size.
+        FoundNext += 10;
+        // Get the Unreal object size from the instruction immediate operand.
+        size_t ObjectSize = static_cast<size_t>(utils::GetInstructionImm32(FoundNext, 2));
+
+        // Seek to the LEA instruction that passes the Unreal object name.
+        FoundNext += 6;
+        // Get the name of the Unreal object from the address passed into RDX.
+        std::wstring ObjectName = static_cast<wchar_t*>(utils::GetInstructionTarget(FoundNext, 3));
+
+        // Insert this Unreal object size into the map.
+        UnrealObjectSizeMap[ObjectName] = ObjectSize;
+    }
+
+
+    return NOERROR;
+}
+
+struct FieldMapEntry {
+    FieldMapEntry() : Size(0) { memset(Name, 0, sizeof(Name) + sizeof(TypeName)); }
+
+    FieldMapEntry(const char* InName, const char *InTypeName, size_t InSize) : Size(InSize)
+    {
+        strncpy_s(Name, InName, sizeof(Name));
+        strncpy_s(TypeName, InTypeName, sizeof(TypeName));
+    }
+
+    FieldMapEntry& operator=(const FieldMapEntry& Other)
+    {
+        strncpy_s(Name, Other.Name, sizeof(Name));
+        strncpy_s(TypeName, Other.TypeName, sizeof(TypeName));
+        Size = Other.Size;
+        return *this;
+    }
+
+    char Name[256];
+    char TypeName[256];
+    size_t Size;
+};
+
+#define FIELD_MAP_ENTRY(Name, Type) \
+    FieldMapEntry(_XOR_(Name), _XOR_(#Type), sizeof(Type))
+
+typedef std::map<size_t, FieldMapEntry> FieldMapType;
+
+int DumpStructs()
+{
+    int rc;
+    size_t Offset;
+    size_t Size;
+    FieldMapType::iterator FieldIter;
+    UnrealObjectSizeMapType::iterator SizeIter;
+    size_t UObjectSize, UFieldSize, UStructSize, UFunctionSize, UPropertySize, UEnumSize;
+
+    // Get the needed Unreal object struct sizes.
+    rc = InitializeUnrealObjectSizeMap();
+    if (rc != NOERROR) {
+        LOG_ERROR(_XOR_("Failed to initialize Unreal object size map with rc %d"), rc);
+        return rc;
+    }
+
+#if defined(_DEBUG)
+    // Dump the Unreal object struct sizes.
+    LOG_INFO(_XOR_("Unreal Object Sizes:"));
+    for (auto it : UnrealObjectSizeMap) {
+        LOG_INFO(_XOR_("%ws size = 0x%08x"), it.first.c_str(), it.second);
+    }
+#endif // _DEBUG
+
+    //
+    // Dump the UObject fields.
+    //
+    std::map<size_t, FieldMapEntry> UObjectFieldMap;
+    UObjectFieldMap[ObjectFlagsEncryptedOffset] = FIELD_MAP_ENTRY("ObjectFlagsEncrypted", int32_t);
+    UObjectFieldMap[ObjectOuterEncryptedOffset] = FIELD_MAP_ENTRY("OuterEncrypted", uint64_t);
+    UObjectFieldMap[ObjectInternalIndexEncryptedOffset] = FIELD_MAP_ENTRY("InternalIndexEncrypted", int32_t);
+    UObjectFieldMap[ObjectClassEncryptedOffset] = FIELD_MAP_ENTRY("ClassEncrypted", uint64_t);
+    UObjectFieldMap[ObjectNameIndexEncryptedOffset] = FIELD_MAP_ENTRY("NameIndexEncrypted", int32_t);
+    UObjectFieldMap[ObjectNameNumberEncryptedOffset] = FIELD_MAP_ENTRY("NameNumberEncrypted", int32_t);
+    LOG_INFO(_XOR_("class UObject {"));
+    LOG_INFO(_XOR_("public:"));
+
+    LOG_INFO(_XOR_("    void **VTable; // 0x%04x (size=0x%04x)"), 0, sizeof(void**));
+    Offset = 0;
+    Size = sizeof(void**);
+    FieldIter = UObjectFieldMap.begin();
+    while (FieldIter != UObjectFieldMap.end()) {
+        FieldMapEntry Entry = FieldIter->second;
+        size_t LastOffset = Offset; Offset = FieldIter->first;
+        size_t LastSize = Size; Size = Entry.Size;
+        if (LastOffset + LastSize < Offset) {
+            size_t PaddingSize = Offset - (LastOffset + LastSize);
+            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
+                     LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
+        }
+        LOG_INFO(_XOR_("    %s %s; // 0x%04x (size=0x%04x)"), Entry.TypeName, Entry.Name, Offset, Size);
+        ++FieldIter;
+    }
+
+    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UObject"));
+    if (SizeIter != UnrealObjectSizeMap.end()) {
+        UObjectSize = SizeIter->second;
+        if (UObjectSize > Offset + Size) {
+            size_t PaddingSize = UObjectSize - (Offset + Size);
+            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
+                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
+        }
+        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UObjectSize, Offset + Size);
+    } else {
+        UObjectSize = Offset + Size;
+        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), Offset + Size);
+    }
+
+
+    //
+    // Dump the UField fields.
+    //
+    LOG_INFO(_XOR_("class UField : public UObject {"));
+    LOG_INFO(_XOR_("public:"));
+
+    Offset = UObjectSize;
+    Size = sizeof(void*);
+    LOG_INFO(_XOR_("    UField* Next; // 0x%04x (size=0x%04x)"), Offset, Size);
+
+    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UField"));
+    if (SizeIter != UnrealObjectSizeMap.end()) {
+        UFieldSize = SizeIter->second;
+        if (UFieldSize > Offset + Size) {
+            size_t PaddingSize = UFieldSize - (Offset + Size);
+            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
+                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
+        }
+        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UFieldSize, Offset + Size);
+    } else {
+        UFieldSize = Offset + Size;
+        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), UFieldSize);
+    }
+
+
+    //
+    // Dump the UStruct fields.
+    //
+    std::map<size_t, FieldMapEntry> UStructFieldMap;
+    UStructFieldMap[StructPropertiesSizeOffset] = FIELD_MAP_ENTRY("PropertiesSize", int32_t);
+    UStructFieldMap[StructMinAlignmentOffset] = FIELD_MAP_ENTRY("MinAlignment", int32_t);
+    UStructFieldMap[StructChildrenOffset] = FieldMapEntry("Children", "UField*", sizeof(void*));
+    UStructFieldMap[StructSuperStructOffset] = FieldMapEntry("SuperStruct", "class UStruct*", sizeof(void*));
+    LOG_INFO(_XOR_("class UStruct : public UField {"));
+    LOG_INFO(_XOR_("public:"));
+
+    Offset = UFieldSize;
+    Size = 0;
+    FieldIter = UStructFieldMap.begin();
+    while (FieldIter != UStructFieldMap.end()) {
+        FieldMapEntry Entry = FieldIter->second;
+        size_t LastOffset = Offset; Offset = FieldIter->first;
+        size_t LastSize = Size; Size = Entry.Size;
+        if (LastOffset + LastSize < Offset) {
+            size_t PaddingSize = Offset - (LastOffset + LastSize);
+            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
+                     LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
+        }
+        LOG_INFO(_XOR_("    %s %s; // 0x%04x (size=0x%04x)"), Entry.TypeName, Entry.Name, Offset, Size);
+        ++FieldIter;
+    }
+
+    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UStruct"));
+    if (SizeIter != UnrealObjectSizeMap.end()) {
+        UStructSize = SizeIter->second;
+        if (UStructSize > Offset + Size) {
+            size_t PaddingSize = UStructSize - (Offset + Size);
+            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
+                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
+        }
+        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UStructSize, Offset + Size);
+    } else {
+        UStructSize = Offset + Size;
+        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), UStructSize);
+    }
+
+
+    //
+    // Dump the UFunction fields.
+    //
+    std::map<size_t, FieldMapEntry> UFunctionFieldMap;
+    UFunctionFieldMap[FunctionFlagsOffset] = FIELD_MAP_ENTRY("FunctionFlags", int32_t);
+    LOG_INFO(_XOR_("class UFunction : public UStruct {"));
+    LOG_INFO(_XOR_("public:"));
+
+    Offset = UStructSize;
+    Size = 0;
+    FieldIter = UFunctionFieldMap.begin();
+    while (FieldIter != UFunctionFieldMap.end()) {
+        FieldMapEntry Entry = FieldIter->second;
+        size_t LastOffset = Offset; Offset = FieldIter->first;
+        size_t LastSize = Size; Size = Entry.Size;
+        if (LastOffset + LastSize < Offset) {
+            size_t PaddingSize = Offset - (LastOffset + LastSize);
+            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
+                     LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
+        }
+        LOG_INFO(_XOR_("    %s %s; // 0x%04x (size=0x%04x)"), Entry.TypeName, Entry.Name, Offset, Size);
+        ++FieldIter;
+    }
+
+    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UFunction"));
+    if (SizeIter != UnrealObjectSizeMap.end()) {
+        UFunctionSize = SizeIter->second;
+        if (UFunctionSize > Offset + Size) {
+            size_t PaddingSize = UFunctionSize - (Offset + Size);
+            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
+                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
+        }
+        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UFunctionSize, Offset + Size);
+    } else {
+        UFunctionSize = Offset + Size;
+        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), UFunctionSize);
+    }
+
+
+    //
+    // Dump the UProperty fields.
+    //
+    std::map<size_t, FieldMapEntry> UPropertyFieldMap;
+    UPropertyFieldMap[PropertyElementSizeOffset] = FIELD_MAP_ENTRY("ElementSize", int32_t);
+    UPropertyFieldMap[PropertyArrayDimOffset] = FIELD_MAP_ENTRY("ArrayDim", int32_t);
+    UPropertyFieldMap[PropertyOffset_InternalOffset] = FIELD_MAP_ENTRY("Offset_Internal", int32_t);
+    UPropertyFieldMap[PropertyFlagsOffset] = FIELD_MAP_ENTRY("PropertyFlags", uint64_t);
+    LOG_INFO(_XOR_("class UProperty : public UField {"));
+    LOG_INFO(_XOR_("public:"));
+
+    Offset = UFieldSize;
+    Size = 0;
+    FieldIter = UPropertyFieldMap.begin();
+    while (FieldIter != UPropertyFieldMap.end()) {
+        FieldMapEntry Entry = FieldIter->second;
+        size_t LastOffset = Offset; Offset = FieldIter->first;
+        size_t LastSize = Size; Size = Entry.Size;
+        if (LastOffset + LastSize < Offset) {
+            size_t PaddingSize = Offset - (LastOffset + LastSize);
+            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
+                     LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
+        }
+        LOG_INFO(_XOR_("    %s %s; // 0x%04x (size=0x%04x)"), Entry.TypeName, Entry.Name, Offset, Size);
+        ++FieldIter;
+    }
+
+    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UProperty"));
+    if (SizeIter != UnrealObjectSizeMap.end()) {
+        UPropertySize = SizeIter->second;
+        if (UPropertySize > Offset + Size) {
+            size_t PaddingSize = UPropertySize - (Offset + Size);
+            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
+                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
+        }
+        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UPropertySize, Offset + Size);
+    } else {
+        UPropertySize = Offset + Size;
+        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), UPropertySize);
+    }
+
+
+    //
+    // Dump the UEnum fields.
+    //
+    std::map<size_t, FieldMapEntry> UEnumFieldMap;
+    UEnumFieldMap[EnumNamesOffset] = FieldMapEntry(_XOR_("Names"), _XOR_("TArray<TPair<FName, int64_t>>"), 16);
+    UEnumFieldMap[EnumCppFormOffset] = FIELD_MAP_ENTRY("CppForm", int32_t);
+    LOG_INFO(_XOR_("class UEnum : public UField {"));
+    LOG_INFO(_XOR_("public:"));
+
+    Offset = UFieldSize;
+    Size = 0;
+    FieldIter = UEnumFieldMap.begin();
+    while (FieldIter != UEnumFieldMap.end()) {
+        FieldMapEntry Entry = FieldIter->second;
+        size_t LastOffset = Offset; Offset = FieldIter->first;
+        size_t LastSize = Size; Size = Entry.Size;
+        if (LastOffset + LastSize < Offset) {
+            size_t PaddingSize = Offset - (LastOffset + LastSize);
+            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
+                     LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
+        }
+        LOG_INFO(_XOR_("    %s %s; // 0x%04x (size=0x%04x)"), Entry.TypeName, Entry.Name, Offset, Size);
+        ++FieldIter;
+    }
+
+    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UEnum"));
+    if (SizeIter != UnrealObjectSizeMap.end()) {
+        UEnumSize = SizeIter->second;
+        if (UEnumSize > Offset + Size) {
+            size_t PaddingSize = UEnumSize - (Offset + Size);
+            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
+                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
+        }
+        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UEnumSize, Offset + Size);
+    } else {
+        UEnumSize = Offset + Size;
+        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), UEnumSize);
+    }
+
+    return NOERROR;
 }
 
 
@@ -865,7 +1463,7 @@ int DumpNames()
         Found = static_cast<const uint8_t*>(utils::GetCallTargetAddress(Found + 8));
     if (!Found) {
         LOG_ERROR(_XOR_("Failed to find FName::InitInternal_FindOrAddNameEntry signature!"));
-        return STATUS_NOT_FOUND;
+        return ERROR_NOT_FOUND;
     }
     LOG_INFO(_XOR_("Found the FName::InitInternal_FindOrAddNameEntry signature: 0x%p"), Found);
 
@@ -1012,9 +1610,6 @@ int DumpNames()
                     } else {
                         LOG_ERROR(_XOR_("FNameEntry::IndexEncrypted decryption heuristic failed!"));
                     }
-
-                } else {
-                    LOG_ERROR(_XOR_("FNameEntry::IndexEncrypted heuristic failed!"));
                 }
             }
 
@@ -1296,9 +1891,8 @@ int DumpNames()
         Found = static_cast<const uint8_t*>(utils::GetCallTargetAddress(Found + 16));
     if (!Found) {
         LOG_ERROR(_XOR_("Failed to find FArchive::PropertyTagOperator signature!"));
-        return STATUS_NOT_FOUND;
+        return ERROR_NOT_FOUND;
     }
-
     LOG_INFO(_XOR_("Found FArchive::PropertyTagOperator routine at 0x%p"), Found);
 
     // Disassemble the FArchive::PropertyTagOperator routine.
@@ -1446,345 +2040,144 @@ int DumpNames()
     return rc;
 }
 
-typedef std::map<std::wstring, size_t> UnrealObjectSizeMapType;
-UnrealObjectSizeMapType UnrealObjectSizeMap;
 
-int InitializeUnrealObjectSizeMap()
+
+
+
+/**
+ * World offsets and inline decryption globals.
+ */
+static size_t WorldEncryptedOffset = -1;
+static int8_t WorldEncryptedRegister = -1;
+static uint8_t* WorldDecryptionBegin = nullptr;
+static uint8_t* WorldDecryptionEnd = nullptr;
+
+
+int DumpWorld()
 {
+    int rc = NOERROR;
+    const uint8_t* Found;
+    uint64_t TargetAddress;
+    DECLARE_DISASM_VARS();
+
     void* ImageBase = utils::GetModuleHandleWIDE(nullptr /*0xC4D8736D TslGame.exe */);
     uint32_t ImageSize = utils::GetModuleSize((HMODULE)ImageBase);
-    const uint8_t* SearchEnd = static_cast<uint8_t*>(ImageBase) + ImageSize;
-    uint8_t* SearchBase;
-    size_t SearchSize;
-    const uint8_t *FoundNext;
-    UnrealObjectSizeMapType::iterator UnrealObjectSizeIter;
 
-    // Construct a map of Unreal object sizes using the AutoInitialize instrinsic stubs.
-    // UStruct__AutoInit proc near
-    // .text:7FF7F0277820 45 33 C9              xor     r9d, r9d
-    // .text:7FF7F0277823 48 8D 15 AE CF 19 04  lea     rdx, aUstruct       ; "UStruct"
-    // .text:7FF7F027782A 41 B8 E0 00 00 00     mov     r8d, 0E0h
-    // .text:7FF7F0277830 48 8D 0D 39 A6 99 05  lea     rcx, off_7FF7F5C11E70
-    // .text:7FF7F0277837 E9 44 08 6E 01        jmp     sub_7FF7F1958080
-    // UStruct__AutoInit endp
-    // 45 33 C9 48 8D 15 ? ? ? ? 41 B8 ? ? ? ? 48 8D 0D ? ? ? ? E9 ? ? ? ?
-    FoundNext = static_cast<uint8_t*>(ImageBase);
-    while (1) {
-
-        // Set the search base and size for this iteration.
-        SearchBase = const_cast<uint8_t*>(FoundNext) + 1;
-        SearchSize = static_cast<size_t>(SearchEnd - SearchBase);
-        // Do the pattern scan for the next match.
-        FoundNext = utils::FindPatternIDA(SearchBase,
-                                          SearchSize,
-                                          _XOR_("45 33 C9 48 8D 15 ?? ?? ?? ?? 41 B8")
-                                          );
-        if (!FoundNext) {
-            break;
-        }
-
-        // Seek to the LEA instruction that passes the Unreal object name.
-        FoundNext += 3;
-        // Get the name of the Unreal object from the address passed into RDX.
-        std::wstring ObjectName = static_cast<wchar_t*>(utils::GetInstructionTarget(FoundNext, 3));
-
-        // Seek to the MOV instruction that passes the Unreal object size.
-        FoundNext += 7;
-        // Get the Unreal object size from the instruction immediate operand.
-        size_t ObjectSize = static_cast<size_t>(utils::GetInstructionImm32(FoundNext, 2));
-
-        // Insert this Unreal object size into the map.
-        UnrealObjectSizeMap[ObjectName] = ObjectSize;
+    // Search for the GWorld decryption inside an unknown routine:
+    // .text:7FF6FCBF16CC                       loc_7FF6FCBF16CC:               ; CODE XREF: GWorldAndGEngineFunction+115^j
+    // .text:7FF6FCBF16CC 48 8B F7              mov     rsi, rdi
+    // .text:7FF6FCBF16CF                       loc_7FF6FCBF16CF:               ; CODE XREF: GWorldAndGEngineFunction+11A^j
+    // .text:7FF6FCBF16CF 48 8B 0D 52 72 16 04  mov     rcx, cs:GWorld
+    // .text:7FF6FCBF16D6 4C 39 2D 23 14 A2 02  cmp     qword ptr cs:aXenuinesdkCarv_95, r13 ; "XENUINESDK_CARVE"
+    // .text:7FF6FCBF16DD 75 1A                 jnz     short loc_7FF6FCBF16F9  ; Decryption starts here
+    // 48 8B F7 48 8B 0D ? ? ? ?
+    Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("48 8B F7 48 8B 0D"));
+    if (!Found) {
+        LOG_ERROR(_XOR_("Failed to find GWorld decryption signature!"));
+        return ERROR_NOT_FOUND;
     }
+    LOG_INFO(_XOR_("Found GWorld signature at 0x%p"), Found);
 
-    // The second variation that uses an LEA instruction with the size.
-    // .text:7FF7F02777C0                       UField__AutoInit proc near
-    // .text:7FF7F02777C0 45 33 C9              xor     r9d, r9d
-    // .text:7FF7F02777C3 48 8D 15 5E FA 19 04  lea     rdx, aUfield        ; "UField"
-    // .text:7FF7F02777CA 48 8D 0D 77 A6 99 05  lea     rcx, off_7FF7F5C11E48
-    // .text:7FF7F02777D1 45 8D 41 38           lea     r8d, [r9+38h]
-    // .text:7FF7F02777D5 E9 A6 08 6E 01        jmp     sub_7FF7F1958080
-    // .text:7FF7F02777D5                       UField__AutoInit endp
-    // 45 33 C9 48 8D 15 ? ? ? ? 48 8D 0D ? ? ? ? 45 8D 41 ? E9 ? ? ? ?
-    FoundNext = static_cast<uint8_t*>(ImageBase);
-    while (1) {
-
-        // Set the search base and size for this iteration.
-        SearchBase = const_cast<uint8_t*>(FoundNext) + 1;
-        SearchSize = static_cast<size_t>(SearchEnd - SearchBase);
-        // Do the pattern scan for the next match.
-        FoundNext = utils::FindPatternIDA(SearchBase,
-                                          SearchSize,
-                                          _XOR_("45 33 C9 48 8D 15 ?? ?? ?? ?? 48 8D 0D")
-                                          );
-        if (!FoundNext) {
-            break;
-        }
-
-        // Seek to the LEA instruction that passes the Unreal object name.
-        FoundNext += 3;
-        // Get the name of the Unreal object from the address passed into RDX.
-        std::wstring ObjectName = static_cast<wchar_t*>(utils::GetInstructionTarget(FoundNext, 3));
-
-        // Seek to the LEA instruction that passes the Unreal object size.
-        FoundNext += 14;
-        // Get the Unreal object size from the instruction memory operand.
-        size_t ObjectSize = static_cast<size_t>(utils::GetInstructionImm8(FoundNext, 3));
-
-        // Insert this Unreal object size into the map.
-        UnrealObjectSizeMap[ObjectName] = ObjectSize;
-    }
-
-    // The third variation that UObject uses, which looks like this:
-    // .text:7FF7F0370B80                       UObject__AutoInit proc near
-    // .text:7FF7F0370B80 48 83 EC 28           sub     rsp, 28h
-    // .text:7FF7F0370B84 41 B9 B7 75 77 A1     mov     r9d, 0A17775B7h
-    // .text:7FF7F0370B8A 41 B8 30 00 00 00     mov     r8d, 30h ; '0'
-    // .text:7FF7F0370B90 48 8D 15 99 8C A2 04  lea     rdx, aUobject_0     ; "UObject"
-    // .text:7FF7F0370B97 48 8D 0D EA 24 F8 05  lea     rcx, off_7FF7F62F3088
-    // .text:7FF7F0370B9E E8 DD AC 81 02        call    sub_7FF7F2B8B880
-    // .text:7FF7F0370BA3 48 83 C4 28           add     rsp, 28h
-    // .text:7FF7F0370BA7 C3                    retn
-    // .text:7FF7F0370BA7                       UObject__AutoInit endp
-    // 48 83 EC 28 41 B9 ? ? ? ? 41 B8 ? ? ? ? 48 8D 15 ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ?
-    FoundNext = static_cast<uint8_t*>(ImageBase);
-    while (1) {
-
-        // Set the search base and size for this iteration.
-        SearchBase = const_cast<uint8_t*>(FoundNext) + 1;
-        SearchSize = static_cast<size_t>(SearchEnd - SearchBase);
-        // Do the pattern scan for the next match.
-        FoundNext = utils::FindPatternIDA(
-                            SearchBase,
-                            SearchSize,
-                            _XOR_("48 83 EC 28 41 B9 ?? ?? ?? ?? 41 B8 ?? ?? ?? ?? 48 8D 15")
-                            );
-        if (!FoundNext) {
-            break;
-        }
-
-        // Seek to the MOV instruction that passes the Unreal object size.
-        FoundNext += 10;
-        // Get the Unreal object size from the instruction immediate operand.
-        size_t ObjectSize = static_cast<size_t>(utils::GetInstructionImm32(FoundNext, 2));
-
-        // Seek to the LEA instruction that passes the Unreal object name.
-        FoundNext += 6;
-        // Get the name of the Unreal object from the address passed into RDX.
-        std::wstring ObjectName = static_cast<wchar_t*>(utils::GetInstructionTarget(FoundNext, 3));
-
-        // Insert this Unreal object size into the map.
-        UnrealObjectSizeMap[ObjectName] = ObjectSize;
-    }
-
-
-    return NOERROR;
-}
-
-struct FieldMapEntry {
-    FieldMapEntry()
-        : Size(0)
-    {
-        memset(Name, 0, sizeof(Name) + sizeof(TypeName));
-    }
-
-    FieldMapEntry(const char* InName, const char *InTypeName, size_t InSize)
-        : Size(InSize)
-    {
-        strncpy_s(Name, InName, sizeof(Name));
-        strncpy_s(TypeName, InTypeName, sizeof(TypeName));
-    }
-
-    FieldMapEntry& operator=(const FieldMapEntry& Other)
-    {
-        strncpy_s(Name, Other.Name, sizeof(Name));
-        strncpy_s(TypeName, Other.TypeName, sizeof(TypeName));
-        Size = Other.Size;
-        return *this;
-    }
-
-    char Name[256];
-    char TypeName[256];
-    size_t Size;
-};
-
-#define FIELD_MAP_ENTRY(Name, Type) \
-    FieldMapEntry(_XOR_(Name), _XOR_(#Type), sizeof(Type))
-
-typedef std::map<size_t, FieldMapEntry> FieldMapType;
-
-int DumpStructs()
-{
-    int rc;
-    size_t Offset;
-    size_t Size;
-    FieldMapType::iterator FieldIter;
-    UnrealObjectSizeMapType::iterator SizeIter;
-    size_t UObjectSize, UFieldSize, UStructSize, UFunctionSize;
-
-    // Get the needed Unreal object struct sizes.
-    rc = InitializeUnrealObjectSizeMap();
-    if (rc != NOERROR) {
-        LOG_ERROR(_XOR_("Failed to initialize Unreal object size map with rc %d"), rc);
+    // Disassemble the code at the found GWorld signature.
+    rc = DisDecompose(Found,
+                      MAX_DISASM_LENGTH,
+                      (uint64_t)Found,
+                      Insts,
+                      MaxInstCount,
+                      &InstCount,
+                      NULL,
+                      DISASM_X64
+                      );
+    if (rc != DIS_SUCCESS) {
+        LOG_ERROR(_XOR_("Failed to disassemble code at GWorld signature!"));
         return rc;
     }
-    // Dump the Unreal object struct sizes.
-    LOG_INFO(_XOR_("Unreal Object Sizes:"));
-    for (auto it : UnrealObjectSizeMap) {
-        LOG_INFO(_XOR_("%ws size = 0x%08x"), it.first.c_str(), it.second);
-    }
 
-    //
-    // Dump the UObject fields.
-    //
-    std::map<size_t, FieldMapEntry> UObjectFieldMap;
-    UObjectFieldMap[ObjectFlagsEncryptedOffset] = FIELD_MAP_ENTRY("ObjectFlagsEncrypted", uint32_t);
-    UObjectFieldMap[ObjectOuterEncryptedOffset] = FIELD_MAP_ENTRY("OuterEncrypted", uint64_t);
-    UObjectFieldMap[ObjectInternalIndexEncryptedOffset] = FIELD_MAP_ENTRY("InternalIndexEncrypted", uint32_t);
-    UObjectFieldMap[ObjectClassEncryptedOffset] = FIELD_MAP_ENTRY("ClassEncrypted", uint64_t);
-    UObjectFieldMap[ObjectNameIndexEncryptedOffset] = FIELD_MAP_ENTRY("NameIndexEncrypted", uint32_t);
-    UObjectFieldMap[ObjectNameNumberEncryptedOffset] = FIELD_MAP_ENTRY("NameNumberEncrypted", uint32_t);
-    LOG_INFO(_XOR_("class UObject {")); 
-    LOG_INFO(_XOR_("public:"));
-
-    LOG_INFO(_XOR_("    void **VTable; // 0x%04x (size=0x%04x)"), 0, sizeof(void**));
+    // Heuristically search for the GWorld inline decryption.
+    Ip = const_cast<uint8_t *>(Found);
+    TargetAddress = 0;
     Offset = 0;
-    Size = sizeof(void**);
-    FieldIter = UObjectFieldMap.begin();
-    while (FieldIter != UObjectFieldMap.end()) {
-        FieldMapEntry Entry = FieldIter->second;
-        size_t LastOffset = Offset; Offset = FieldIter->first;
-        size_t LastSize = Size; Size = Entry.Size;
-        if (LastOffset + LastSize < Offset) {
-            size_t PaddingSize = Offset - (LastOffset + LastSize);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
+    InstIndex = 0;
+    Inst = Insts;
+    InstEnd = Insts + InstCount;
+    while (Inst < InstEnd) {
+        NextInst = Inst + 1;
+        NextIp = Ip + Inst->size;
+        NextOffset = Offset + Inst->size;
+
+        // Find the the GWorld register mov instruction which leads to the inline decryption.
+        // Search for the GWorld mov instruction:
+        /* mov     rcx, cs:GWorld */
+        /* cmp     qword ptr cs:aXenuinesdkCarv_95, r13 ; "XENUINESDK_CARVE" */
+        /* jnz     short loc_7FF6FCBF16F9 */
+        if (Inst->opcode == I_MOV &&
+            Inst->ops[1].type == O_SMEM &&
+            NextInst->opcode == I_CMP) {
+
+            // We found the GWorld offset and register!
+            WorldEncryptedOffset = static_cast<size_t>(Inst->disp);
+            WorldEncryptedRegister = Inst->ops[0].index;
+
+            // Search for the beginning of the GWorldEncrypted inline decryption:
+            INCREMENT_NEXT_INSTRUCTION();
+            while(META_GET_FC(NextInst->meta) != FC_CND_BRANCH) {
+                INCREMENT_NEXT_INSTRUCTION();
+            }
+            TargetAddress = INSTRUCTION_GET_TARGET(NextInst);
+            // Skip the instructions in between jump and decryption.
+            INCREMENT_NEXT_INSTRUCTION();
+            while (NextInst->addr != TargetAddress) {
+                INCREMENT_NEXT_INSTRUCTION();
+            }
+
+            // We found the beginning of the GWorldEncrypted inline decryption!
+            WorldDecryptionBegin = reinterpret_cast<uint8_t*>(TargetAddress);
+            LOG_INFO(_XOR_("Found the GWorldEncrypted decryption beginning: 0x%p"),
+                     WorldDecryptionBegin);
+
+            // Keep iterating next instruction until we hit the end of the decryption.
+            INCREMENT_NEXT_INSTRUCTION();
+            // Search for the decryption terminating instruction:
+            /* mov     r14, [rbp+Decrypted] */
+            while (!(NextInst->opcode == I_MOV &&
+                     NextInst->ops[1].type == O_SMEM)) {
+                INCREMENT_NEXT_INSTRUCTION();
+            }
+            INCREMENT_NEXT_INSTRUCTION();
+            // We found the end of the GWorldEncrypted encryption!
+            WorldDecryptionEnd = NextIp;
+            LOG_INFO(_XOR_("Found the GWorldEncrypted decryption ending: 0x%p"), WorldDecryptionEnd);
+
+            // We are done!
+            break;
         }
-        LOG_INFO(_XOR_("    %s %s; // 0x%04x (size=0x%04x)"), Entry.TypeName, Entry.Name, Offset, Size);
-        ++FieldIter;
+
+        // Increment to the next instruction.
+        Inst = NextInst;
+        Ip = NextIp;
+        Offset = NextOffset;
+        InstIndex = static_cast<uint32_t>(NextInst - Insts);
     }
 
-    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UObject"));
-    if (SizeIter != UnrealObjectSizeMap.end()) {
-        UObjectSize = SizeIter->second;
-        if (UObjectSize > Offset + Size) {
-            size_t PaddingSize = UObjectSize - (Offset + Size);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
+    // Output the heauristic search results.
+    if (WorldEncryptedOffset != -1) {
+        LOG_INFO(_XOR_("GWorld offset = 0x%08x"), WorldEncryptedOffset);
+        LOG_INFO(_XOR_("GWorld register = %s"), RegisterStrings[WorldEncryptedRegister]);
+        LOG_INFO(_XOR_("GWorld decryption = {"));
+        std::string BufferString = utils::FormatBuffer(WorldDecryptionBegin,
+                                                       __MIN(static_cast<size_t>(WorldDecryptionEnd - WorldDecryptionBegin), 1024));
+        for (auto Line : utils::SplitString(BufferString, '\n')) {
+            LOG_INFO(Line.c_str());
         }
-        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UObjectSize, Offset + Size);
-    } else {
-        UObjectSize = Offset + Size;
-        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), Offset + Size);
+        LOG_INFO(_XOR_("}; "));
     }
 
-
-    //
-    // Dump the UField fields.
-    //
-    LOG_INFO(_XOR_("class UField : public UObject {"));
-    LOG_INFO(_XOR_("public:"));
-
-    Offset = UObjectSize;
-    Size = sizeof(void*);
-    LOG_INFO(_XOR_("    UField* Next; // 0x%04x (size=0x%04x)"), Offset, Size);
-
-    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UField"));
-    if (SizeIter != UnrealObjectSizeMap.end()) {
-        UFieldSize = SizeIter->second;
-        if (UFieldSize > Offset + Size) {
-            size_t PaddingSize = UFieldSize - (Offset + Size);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
-        }
-        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UFieldSize, Offset + Size);
-    } else {
-        UFieldSize = Offset + Size;
-        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), UFieldSize);
-    }
-
-
-    //
-    // Dump the UStruct fields.
-    //
-    std::map<size_t, FieldMapEntry> UStructFieldMap;
-    UStructFieldMap[StructPropertiesSizeOffset] = FIELD_MAP_ENTRY("PropertiesSize", int32_t);
-    UStructFieldMap[StructMinAlignmentOffset] = FIELD_MAP_ENTRY("MinAlignment", int32_t);
-    UStructFieldMap[StructChildrenOffset] = FieldMapEntry("Children", "UField*", sizeof(void*));
-    UStructFieldMap[StructSuperStructOffset] = FieldMapEntry("SuperStruct", "class UStruct*", sizeof(void*));
-    LOG_INFO(_XOR_("class UStruct : public UField {"));
-    LOG_INFO(_XOR_("public:"));
-
-    Offset = UFieldSize;
-    Size = 0;
-    FieldIter = UStructFieldMap.begin();
-    while (FieldIter != UStructFieldMap.end()) {
-        FieldMapEntry Entry = FieldIter->second;
-        size_t LastOffset = Offset; Offset = FieldIter->first;
-        size_t LastSize = Size; Size = Entry.Size;
-        if (LastOffset + LastSize < Offset) {
-            size_t PaddingSize = Offset - (LastOffset + LastSize);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
-        }
-        LOG_INFO(_XOR_("    %s %s; // 0x%04x (size=0x%04x)"), Entry.TypeName, Entry.Name, Offset, Size);
-        ++FieldIter;
-    }
-
-    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UStruct"));
-    if (SizeIter != UnrealObjectSizeMap.end()) {
-        UStructSize = SizeIter->second;
-        if (UStructSize > Offset + Size) {
-            size_t PaddingSize = UStructSize - (Offset + Size);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
-        }
-        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UStructSize, Offset + Size);
-    } else {
-        UStructSize = Offset + Size;
-        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), UStructSize);
-    }
-
-
-    //
-    // Dump the UFunction fields.
-    //
-    std::map<size_t, FieldMapEntry> UFunctionFieldMap;
-    UFunctionFieldMap[FunctionFlagsOffset] = FIELD_MAP_ENTRY("FunctionFlags", int32_t);
-    LOG_INFO(_XOR_("class UFunction : public UStruct {"));
-    LOG_INFO(_XOR_("public:"));
-
-    Offset = UStructSize;
-    Size = 0;
-    FieldIter = UFunctionFieldMap.begin();
-    while (FieldIter != UFunctionFieldMap.end()) {
-        FieldMapEntry Entry = FieldIter->second;
-        size_t LastOffset = Offset; Offset = FieldIter->first;
-        size_t LastSize = Size; Size = Entry.Size;
-        if (LastOffset + LastSize < Offset) {
-            size_t PaddingSize = Offset - (LastOffset + LastSize);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
-        }
-        LOG_INFO(_XOR_("    %s %s; // 0x%04x (size=0x%04x)"), Entry.TypeName, Entry.Name, Offset, Size);
-        ++FieldIter;
-    }
-
-    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UFunction"));
-    if (SizeIter != UnrealObjectSizeMap.end()) {
-        UFunctionSize = SizeIter->second;
-        if (UFunctionSize > Offset + Size) {
-            size_t PaddingSize = UFunctionSize - (Offset + Size);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
-        }
-        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UFunctionSize, Offset + Size);
-    } else {
-        UFunctionSize = Offset + Size;
-        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), UFunctionSize);
-    }
-
-    return NOERROR;
+    return rc;
 }
+
+
+
+
+
 
 }

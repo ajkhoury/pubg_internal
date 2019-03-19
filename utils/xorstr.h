@@ -142,5 +142,5 @@ constexpr ALWAYS_INLINE auto _xor_(char32_t const (&str)[_length])
     return XorStrU32<_length>(str);
 }
 
-#define _XOR_(str) _xor_(str).get()
-#define _XORSTR_(str) _xor_(str).str()
+#define _XOR_(s) _xor_(s).get()
+#define _XORSTR_(s) _xor_(s).str()

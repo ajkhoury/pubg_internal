@@ -12,7 +12,7 @@ extern "C" {
 #endif
 uint64_t DecryptNamesAsm(uint64_t NamesEncrypted);
 uint64_t DecryptChunksAsm(uint64_t ChunksEncrypted);
-uint64_t DecryptNumElementsAsm(uint64_t ChunksEncrypted);
+uint64_t DecryptNumElementsAsm(uint64_t NumElementsEncrypted);
 uint64_t DecryptNameEntryIndexAsm(uint64_t IndexEncrypted);
 #ifdef __cplusplus
 }
@@ -119,7 +119,7 @@ private:
     uint64_t NumChunksEncrypted;
 };
 
-typedef TStaticIndirectArrayThreadSafeRead<FNameEntry, 2 * 1024 * 1024, 16836> TNameEntryArray;
+typedef TStaticIndirectArrayThreadSafeRead<FNameEntry, 2 * 1024 * 1024, 16188> TNameEntryArray;
 static TNameEntryArray *GNames = NULL;
 
 typedef
@@ -139,29 +139,46 @@ static bool NamesInitializeGlobal()
         return true;
     }
 
-    // E8 ? ? ? ? 4C 8B 15 ? ? ? ? 45 33 FF
-    static const UINT8 NamesSig[] = {
-        0xE8, 0xCC, 0xCC, 0xCC, 0xCC,             /* call    FName__GetNamesEncrypted */
-        0x4C, 0x8B, 0x15, 0xCC, 0xCC, 0xCC, 0xCC, /* mov     r10, qword ptr cs:aXenuinesdkCarv_101 */
-        0x45, 0x33, 0xFF                          /* xor     r15d, r15d */
-    };
     ImageBase = utils::GetModuleHandleWIDE(NULL);
     ImageSize = utils::GetModuleSize((HMODULE)ImageBase);
-    
+
+    //// E8 ? ? ? ? 4C 8B 15 ? ? ? ? 45 33 FF
+    //static const UINT8 NamesSig[] = {
+    //    0xE8, 0xCC, 0xCC, 0xCC, 0xCC,             /* call    FName__GetNamesEncrypted */
+    //    0x4C, 0x8B, 0x15, 0xCC, 0xCC, 0xCC, 0xCC, /* mov     r10, qword ptr cs:aXenuinesdkCarv_101 */
+    //    0x45, 0x33, 0xFF                          /* xor     r15d, r15d */
+    //};
+    //const uint8_t *Found;
+    //do Found = utils::FindPattern(ImageBase, ImageSize, 0xCC, NamesSig, sizeof(NamesSig));
+    //while (!Found);
+
+    // Locate signature inside of the FName::GetEncryptedNames routine:
+    // .text:7FF6FDBE6181 E8 9A 89 3A FD                call    tslgame_AK__MemoryMgr__StartProfileThreadUsage
+    // .text:7FF6FDBE6186 8B 15 94 36 3D 03             mov     edx, cs:dword_7FF700FB9820
+    // .text:7FF6FDBE618C 65 48 8B 04 25 58 00 00 00    mov     rax, gs:58h
+    // .text:7FF6FDBE6195 B9 18 00 00 00                mov     ecx, 18h
+    // .text:7FF6FDBE619A 48 8B 1C D0                   mov     rbx, [rax+rdx*8]
+    // .text:7FF6FDBE619E 48 03 D9                      add     rbx, rcx
+    // .text:7FF6FDBE61A1 45 33 F6                      xor     r14d, r14d
+    // E8 ? ? ? ? 8B 15 ? ? ? ? 65 48 8B 04 25 58 00 00 00 B9 18 00 00 00 48 8B 1C D0 48 03 D9
     const uint8_t *Found;
-    do Found = utils::FindPattern(ImageBase, ImageSize, 0xCC, NamesSig, sizeof(NamesSig));
+    do Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("E8 ?? ?? ?? ?? 8B 15 ?? ?? ?? ?? 65 48 8B 04 25 58 00 00 00 B9 18 00 00 00 48 8B 1C D0 48 03 D9"));
     while (!Found);
-
+    
+    // Get the function address.
     GetEncryptedNamesFn GetEncryptedNames;
-    uint64_t NamesEncrypted;
-    union CryptValue NamesDecrypted;
-
-    GetEncryptedNames = reinterpret_cast<GetEncryptedNamesFn>(utils::GetCallTargetAddress(Found));
+    if (utils::FindFunctionStartFromPtr(Found, 128, (const uint8_t**)&GetEncryptedNames) != NOERROR) {
+        return false;
+    }
     LOG_INFO(_XOR_("GetEncryptedNames = 0x%016llx"), GetEncryptedNames);
 
     // Little wait that is needed since we are loaded very early on.
     WaitInterval.QuadPart = INTERVAL_RELATIVE(MILLISECONDS(1000));
     NtDelayExecution(FALSE, &WaitInterval);
+
+    // Get the decrypted Names pointer.
+    uint64_t NamesEncrypted;
+    union CryptValue NamesDecrypted;
 
     GetEncryptedNames(&NamesEncrypted);
     LOG_INFO(_XOR_("NamesEncrypted = 0x%016llx"), NamesEncrypted);
@@ -213,12 +230,12 @@ std::string NamesProxy::GetById(int32_t id) const
             //    int WideNameLen = static_cast<int>(wcslen(WideName));
             //    int size = WideCharToMultiByte(CP_UTF8, 0, WideName, WideNameLen, NULL, 0, NULL, NULL);
             //    if (size) {
-            //        Str.assign(size, 0);
+            //        Str.resize(size, 0);
             //        WideCharToMultiByte(CP_UTF8, 0, WideName, WideNameLen, (LPSTR)Str.data(), size, NULL, NULL);
             //    }
             //
             //} else {
-            //    Str.assign(NameEntry->GetAnsiName());
+            //    Str = NameEntry->GetAnsiName();
             //}
         }
     }

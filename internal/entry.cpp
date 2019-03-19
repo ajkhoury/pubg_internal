@@ -18,7 +18,7 @@ TestThreadRoutine(
     IN HMODULE hModule
 )
 {
-    int rc;
+    int rc = NOERROR;
     LARGE_INTEGER WaitInterval;
     //PVOID Found;
     
@@ -29,83 +29,80 @@ TestThreadRoutine(
     LOG_DEBUG(_XOR_("ImageBase = 0x%016llx  ImageSize = 0x%08x"), ImageBase, ImageSize);
 
     // Wait for VMProtect to completely unpack.
-    WaitInterval.QuadPart = INTERVAL_RELATIVE(MILLISECONDS(10000));
+    WaitInterval.QuadPart = INTERVAL_RELATIVE(MILLISECONDS(8000));
     NtDelayExecution(FALSE, &WaitInterval);
 
-    rc = dumper::DumpObjects();
+    // Dump heuristic search results.
+    rc |= dumper::DumpObjects();
+    rc |= dumper::DumpNames();
+    rc |= dumper::DumpWorld();
+    rc |= dumper::DumpStructs();
     if (rc != NOERROR) {
         return STATUS_UNSUCCESSFUL;
     }
 
-    rc = dumper::DumpNames();
-    if (rc != NOERROR) {
+    NamesProxy Names;
+    if (!Names.GetAddress()) {
+        LOG_ERROR(_XOR_("Failed to initialize Names!"));
         return STATUS_UNSUCCESSFUL;
     }
-
-    rc = dumper::DumpStructs();
-    if (rc != NOERROR) {
+    
+    ObjectsProxy Objects;
+    if (!Objects.GetAddress()) {
+        LOG_ERROR(_XOR_("Failed to initialize Objects!"));
         return STATUS_UNSUCCESSFUL;
     }
+    
+    WorldProxy World;
+    if (!World.GetEncryptedPointerAddress()) {
+        LOG_ERROR(_XOR_("Failed to initialize World!"));
+        return STATUS_UNSUCCESSFUL;
+    }
+    
+    int32_t LoopCount = 0;
+    while(TRUE) {
+    
+        WaitInterval.QuadPart = INTERVAL_RELATIVE(MILLISECONDS(1000));
+        NtDelayExecution(FALSE, &WaitInterval);
+    
+        LOG_DEBUG(_XOR_("Names address = 0x%016llx"), Names.GetAddress());
+        LOG_DEBUG(_XOR_("Names count = %d"), Names.GetNum());
+    
+        LOG_DEBUG(_XOR_("Objects address = 0x%016llx"), Objects.GetAddress());
+        LOG_DEBUG(_XOR_("Objects count = %d"), Objects.GetNum());
+    
+        LOG_DEBUG(_XOR_("World address = 0x%016llx"), World.GetAddress());
+        if (World.GetAddress()) {
+            if (++LoopCount > 5)
+                break;
+        }
 
+        ClassProxy UEnumStatic = Objects.FindClass("Class CoreUObject.Enum");
+        if (UEnumStatic.IsValid()) {
+            LOG_DEBUG(_XOR_("UEnumStatic = 0x%p"), UEnumStatic.GetAddress());
+        }
+        
+    
+        //++NameId;
+        //const char *NameData = Names.GetById(NameId);
+        //if (NameData) {
+        //    LOG_DEBUG(_XOR_("Names[%d] = \"%s\""), NameId, Names.GetById(NameId));
+        //}
+        //void **NamesData = static_cast<void **>(Names.GetAddress());
+        //LOG_INFO(_XOR_("NamesData0 = 0x%016llx"), NamesData[0]);
+        //LOG_INFO(_XOR_("NamesData1 = 0x%016llx"), NamesData[1]);
+    }
 
-    //NamesProxy Names;
-    //if (!Names.GetAddress()) {
-    //    LOG_ERROR(_XOR_("Failed to initialize Names!"));
-    //    return STATUS_UNSUCCESSFUL;
-    //}
-    //
-    //ObjectsProxy Objects;
-    //if (!Objects.GetAddress()) {
-    //    LOG_ERROR(_XOR_("Failed to initialize Objects!"));
-    //    return STATUS_UNSUCCESSFUL;
-    //}
-    //
-    //WorldProxy World;
-    //if (!World.GetEncryptedPointerAddress()) {
-    //    LOG_ERROR(_XOR_("Failed to initialize World!"));
-    //    return STATUS_UNSUCCESSFUL;
-    //}
-    //
-    //int32_t LoopCount = 0;
-    //while(TRUE) {
-    //
-    //    WaitInterval.QuadPart = INTERVAL_RELATIVE(MILLISECONDS(1000));
-    //    NtDelayExecution(FALSE, &WaitInterval);
-    //
-    //    LOG_DEBUG(_XOR_("Names address = 0x%016llx"), Names.GetAddress());
-    //    LOG_DEBUG(_XOR_("Names count = %d"), Names.GetNum());
-    //
-    //    LOG_DEBUG(_XOR_("Objects address = 0x%016llx"), Objects.GetAddress());
-    //    LOG_DEBUG(_XOR_("Objects count = %d"), Objects.GetNum());
-    //
-    //    LOG_DEBUG(_XOR_("World address = 0x%016llx"), World.GetAddress());
-    //
-    //    if (World.GetAddress()) {
-    //        if (++LoopCount > 5)
-    //            break;
-    //    }
-    //
-    //    //++NameId;
-    //    //const char *NameData = Names.GetById(NameId);
-    //    //if (NameData) {
-    //    //    LOG_DEBUG(_XOR_("Names[%d] = \"%s\""), NameId, Names.GetById(NameId));
-    //    //}
-    //    //void **NamesData = static_cast<void **>(Names.GetAddress());
-    //    //LOG_INFO(_XOR_("NamesData0 = 0x%016llx"), NamesData[0]);
-    //    //LOG_INFO(_XOR_("NamesData1 = 0x%016llx"), NamesData[1]);
-    //}
-
-    //for (int32_t i = 0; i < Objects.GetNum(); ++i) {
-    //    ObjectProxy Object = Objects.GetById(i);
+    //for (auto Object : Objects) {
     //    if (Object.IsValid()) {
     //        auto FullName = Object.GetFullName();
     //        if (!FullName.empty()) {
-    //            LOG_DBG_PRINT("%s\n", FullName.c_str());
+    //            LOG_INFO(_XOR_("Object[%d] = %s"), Object.GetUniqueId(), FullName.c_str());
     //        }
     //    }
     //}
 
-    //GeneratorProcessPackages(_XOR_("C:\\Users\\Owner\\Desktop\\sdk"));
+    GeneratorProcessPackages(_XOR_("C:\\Users\\Owner\\Desktop\\sdk"));
 
     return STATUS_SUCCESS;
 }
@@ -128,7 +125,7 @@ DllMain(
         //
         // Initialize logger subsystem.
         //
-        Status = LogInitialize(LogPutLevelDebug | LogOptDisableFunctionName,
+        Status = LogInitialize(LogPutLevelDebug | LogOptDisableFunctionName | LogOptDisableAppend,
                                _XOR_(L"C:\\Users\\Owner\\Log.txt"));
         if (Status != NOERROR) {
             return FALSE;

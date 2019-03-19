@@ -16,27 +16,24 @@ DEFINE_STATIC_CLASS(ScriptStruct);
 DEFINE_STATIC_CLASS(Function);
 DEFINE_STATIC_CLASS(Class);
 
+//ObjectProxy ObjectIterator::operator*() const { return ObjectsProxy().GetById(Index); }
+//ObjectProxy ObjectIterator::operator->() const { return ObjectsProxy().GetById(Index); }
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 uint64_t DecryptObjectsAsm(uint64_t ObjectsEncrypted);
 uint32_t DecryptObjectFlagsAsm(uint32_t ObjectFlagsEncrypted);
-uint32_t DecryptObjectInternalIndexAsm(uint64_t InternalIndexEncrypted);
+uint32_t DecryptObjectInternalIndexAsm(uint32_t InternalIndexEncrypted);
 uint64_t DecryptObjectClassAsm(uint64_t ClassEncrypted);
 uint64_t DecryptObjectOuterAsm(uint64_t OuterEncrypted);
-void DecryptObjectFNameAsm(const FNameEncrypted* InNameEncrypted, int32_t* OutIndex, int32_t* OutNumber);
+void DecryptObjectFNameAsm(const int32_t InNameIndexEncrypted,
+                           const int32_t InNameNumberEncrypted,
+                           int32_t* OutIndex,
+                           int32_t* OutNumber);
 #ifdef __cplusplus
 }
 #endif
-
-
-class FUObjectItem {
-public:
-    UObject *Object; // 0x00
-    int32_t Flags; // 0x08
-    int32_t ClusterIndex; // 0x0C
-    int32_t SerialNumber; // 0x10
-}; // size=0x18
 
 class TUObjectArray {
 public:
@@ -77,17 +74,31 @@ static bool ObjectsInitializeGlobal()
     ImageSize = utils::GetModuleSize((HMODULE)ImageBase);
 
     // 48 8D 0D ? ? ? ? E8 ? ? ? ? 90 48 8B 5C 24 ? 48 83 C4 30
-    static const UINT8 ObjectsSig[] = {
-        0x48, 0x8D, 0x0D, 0xCC, 0xCC, 0xCC, 0xCC,   /* lea     rcx, GUObjectArray */
-        0xE8, 0xCC, 0xCC, 0xCC, 0xCC,               /* call    FUObjectArray__FreeUObjectIndex */
-        0x90,                                       /* nop */
-                                                    /* loc_7FF785413906: */
-        0x48, 0x8B, 0x5C, 0x24, 0xCC,               /* mov     rbx, [rsp+48h] */
-        0x48, 0x83, 0xC4, 0x30                      /* add     rsp, 30h */
-    };
+    //static const UINT8 ObjectsSig[] = {
+    //    0x48, 0x8D, 0x0D, 0xCC, 0xCC, 0xCC, 0xCC,   /* lea     rcx, GUObjectArray */
+    //    0xE8, 0xCC, 0xCC, 0xCC, 0xCC,               /* call    FUObjectArray__FreeUObjectIndex */
+    //    0x90,                                       /* nop */
+    //                                                /* loc_7FF785413906: */
+    //    0x48, 0x8B, 0x5C, 0x24, 0xCC,               /* mov     rbx, [rsp+48h] */
+    //    0x48, 0x83, 0xC4, 0x30                      /* add     rsp, 30h */
+    //};
+    //const uint8_t *Found;
+    //do Found = utils::FindPattern(ImageBase, ImageSize, 0xCC, ObjectsSig, sizeof(ObjectsSig));
+    //while (!Found);
 
+    // Search for the GUObjectArray address inside the UObjectBase::Deconstructor routine:
+    // .text:7FF7F194D035 90                    nop
+    // .text:7FF7F194D036 48 8B D7              mov     rdx, rdi                        ; Object
+    // .text:7FF7F194D039 48 8D 0D 88 41 92 04  lea     rcx, GUObjectArray              ; <---- GObjectsArray
+    // .text:7FF7F194D040 E8 5B 3A 00 00        call    FUObjectArray__FreeUObjectIndex
+    // .text:7FF7F194D045 90                    nop
+    // .text:7FF7F194D046                       loc_7FF7F194D046:                       ; CODE XREF: UObjectBase__Deconstructor+28^j
+    // .text:7FF7F194D046                                                               ; UObjectBase__Deconstructor+6C^j ...
+    // .text:7FF7F194D046 48 8B 5C 24 48        mov     rbx, [rsp+38h+arg_8]
+    // .text:7FF7F194D04B 48 83 C4 30           add     rsp, 30h
+    // 48 8D 0D ? ? ? ? E8 ? ? ? ? 90 48 8B 5C 24 ? 48 83 C4 30
     const uint8_t *Found;
-    do Found = utils::FindPattern(ImageBase, ImageSize, 0xCC, ObjectsSig, sizeof(ObjectsSig));
+    do Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 90 48 8B 5C 24 ?? 48 83 C4 30"));
     while (!Found);
 
     GUObjectArray = static_cast<FUObjectArray *>(utils::GetInstructionTarget(Found, 3));
@@ -115,6 +126,16 @@ int64_t ObjectsProxy::GetMax() const
     return static_cast<FUObjectArray *>(ObjectArray)->ObjObjects.MaxElements;
 }
 
+FUObjectItem *ObjectsProxy::GetObjectsPrivate() const
+{
+    union CryptValue ObjectsDecrypted;
+    uint64_t ObjectsEncrypted = static_cast<FUObjectArray *>(ObjectArray)->ObjObjects.ObjectsEncrypted;
+
+    ObjectsDecrypted.Qword = DecryptObjectsAsm(ObjectsEncrypted);
+
+    return (FUObjectItem *)ObjectsDecrypted.Pointer;
+}
+
 UObject *ObjectsProxy::GetById(int32_t Index) const
 {
     union CryptValue ObjectsDecrypted;
@@ -126,6 +147,8 @@ UObject *ObjectsProxy::GetById(int32_t Index) const
 
     return Objects[Index].Object;
 }
+
+
 
 int32_t ObjectProxy::GetFlags() const
 {
@@ -147,25 +170,24 @@ UObject *ObjectProxy::GetOuter() const
     return (UObject *)DecryptObjectOuterAsm(Object->OuterEncrypted);
 }
 
-FName FNameEncrypted::GetDecryptedFName() const
-{
-    int32_t Index, Number;
-    DecryptObjectFNameAsm(this, &Index, &Number);
-    return FName(Index, Number);
-}
-
 FName ObjectProxy::GetFName() const
 {
-    return FName(Object->NameEncrypted);
+    int32_t Index, Number;
+    DecryptObjectFNameAsm(Object->NameIndexEncrypted,
+                          Object->NameNumberEncrypted,
+                          &Index, &Number);
+    return FName(Index, Number);
 }
 
 const UPackage* ObjectProxy::GetOutermost() const
 {
-    UPackage *Top = nullptr;
+    UObject* Top = NULL;
+
     for (UObject* Outer = GetOuter(); Outer; Outer = ObjectProxy(Outer).GetOuter()) {
-        Top = static_cast<UPackage*>(Outer);
+        Top = Outer;
     }
-    return Top;
+
+    return static_cast<const UPackage*>(Top);
 }
 
 std::string ObjectProxy::GetName() const
@@ -174,19 +196,16 @@ std::string ObjectProxy::GetName() const
 
     if (IsValid()) {
 
-        FName Name(Object->NameEncrypted);
-
+        FName Name = GetFName();
         NameString = NamesProxy().GetById(Name.Index);
         if (Name.Number > 0) {
             NameString += '_' + std::to_string(Name.Number);
         }
 
         auto pos = NameString.rfind('/');
-        if (pos == std::string::npos) {
-            return NameString;
+        if (pos != std::string::npos) {
+            NameString = NameString.substr(pos + 1);
         }
-
-        return NameString.substr(pos + 1);
     }
 
     return NameString;
