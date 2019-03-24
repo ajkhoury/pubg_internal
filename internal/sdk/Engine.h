@@ -297,7 +297,7 @@ C_ASSERT(sizeof(UScriptStruct) == 0xF0);
 class UFunction : public UStruct {
 public:
     uint8_t UnknownData0x00E0[0x38]; // 0x00E0 (size=0x0038)
-    int32_t FunctionFlags; // 0x0118 (size=0x0004)
+    uint32_t FunctionFlags; // 0x0118 (size=0x0004)
     uint8_t UnknownData0x011C[0x14]; // 0x011C (size=0x0014)
 }; // size=0x0130
 C_ASSERT(sizeof(UFunction) == 0x130);

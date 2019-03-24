@@ -1385,7 +1385,7 @@ int DumpStructs()
     //
     Offset = UStructSize;
     std::map<size_t, FieldMapEntry> UFunctionFieldMap;
-    UFunctionFieldMap[FunctionFlagsOffset] = FIELD_MAP_ENTRY("FunctionFlags", int32_t);
+    UFunctionFieldMap[FunctionFlagsOffset] = FIELD_MAP_ENTRY("FunctionFlags", uint32_t);
     std::vector<std::wstring> UFunctionInherited;
     UFunctionInherited.push_back(_XORSTR_(L"UStruct"));
     UFunctionSize = DumpStruct(_XORSTR_(L"UFunction"), &UFunctionInherited, &UFunctionFieldMap);

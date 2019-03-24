@@ -20,21 +20,21 @@ static std::unordered_map<std::string, int32_t> GeneratorAlignasClasses = {
 void PrintFileHeader(std::ostream& os, const std::vector<std::string>& includes, const bool isHeaderFile)
 {
     if (isHeaderFile) {
-        os << "#pragma once\n\n";
+        os << _XORSTR_("#pragma once\n\n");
     }
 
-    os << tfm::format("// PUBG SDK\n\n")
-        << tfm::format("#ifdef _MSC_VER\n\t#pragma pack(push, 0x%X)\n#endif\n\n", sizeof(size_t));
+    os << tfm::format(_XOR_("// PUBG SDK\n\n"))
+       << tfm::format(_XOR_("#ifdef _MSC_VER\n#pragma pack(push, %d)\n#endif\n\n"), sizeof(size_t));
 
     if (!includes.empty()) {
         for (auto&& i : includes) {
             if (i[0] != '<' && i[0] != '"') {
                 os << "#include \"" << i << "\"\n";
             } else {
-                os << "#include " << i << "\n";
+                os << "#include " << i << '\n';
             }
         }
-        os << "\n";
+        os << '\n';
     }
 }
 
@@ -45,14 +45,14 @@ void PrintFileHeader(std::ostream& os, const bool isHeaderFile)
 
 void PrintFileFooter(std::ostream& os)
 {
-    os << "#ifdef _MSC_VER\n\t#pragma pack(pop)\n#endif\n";
+    os << _XORSTR_("#ifdef _MSC_VER\n#pragma pack(pop)\n#endif\n");
 }
 
 void PrintSectionHeader(std::ostream& os, const char* name)
 {
-    os << "//---------------------------------------------------------------------------\n"
-        << "//" << name << '\n'
-        << "//---------------------------------------------------------------------------\n\n";
+    os  << _XORSTR_("//---------------------------------------------------------------------------\n")
+        << _XORSTR_("//") << name << '\n'
+        << _XORSTR_("//---------------------------------------------------------------------------\n\n");
 }
 
 std::string GenerateFileName(const FileContentType type, const GeneratorPackage& Package)
@@ -60,22 +60,22 @@ std::string GenerateFileName(const FileContentType type, const GeneratorPackage&
     const char* name;
     switch (type) {
     case FileContentType::Structs:
-        name = "%s_%s_structs.hpp";
+        name = _XOR_("%s_%s_structs.h");
         break;
     case FileContentType::Classes:
-        name = "%s_%s_classes.hpp";
+        name = _XOR_("%s_%s_classes.h");
         break;
     case FileContentType::Functions:
-        name = "%s_%s_functions.cpp";
+        name = _XOR_("%s_%s_functions.cpp");
         break;
     case FileContentType::FunctionParameters:
-        name = "%s_%s_parameters.hpp";
+        name = _XOR_("%s_%s_parameters.h");
         break;
     default:
         assert(false);
     }
 
-    return tfm::format(name, "PUBG", Package.GetName());
+    return tfm::format(name, _XOR_("PUBG"), Package.GetName());
 }
 
 bool GeneratorParameter::MakeType(PropertyFlags flags, GeneratorParameter::Type& type)
@@ -111,11 +111,10 @@ void GeneratorPackage::GenerateEnum(const EnumProxy& Enum)
 {
     GeneratorEnum e;
     e.Name = MakeUniqueCppName(Enum.Get<UEnum>());
-    if (e.Name.find("Default__") != std::string::npos ||
-        e.Name.find("PLACEHOLDER-CLASS") != std::string::npos) {
+    if (e.Name.find(_XOR_("Default__")) != std::string::npos ||
+        e.Name.find(_XOR_("PLACEHOLDER-CLASS")) != std::string::npos) {
         return;
     }
-
     e.FullName = Enum.GetFullName();
 
     LOG_DBG_PRINT("Enum:          %-98s - instance: 0x%p\n", e.FullName.c_str(), Enum.GetAddress());
@@ -198,12 +197,12 @@ void GeneratorPackage::GenerateMethods(const ClassProxy& ClassObj, std::vector<G
 
                     p.CppType = ParamInfo.CppType;
                     if (Param.IsA<BoolPropertyProxy>()) {
-                        p.CppType = "bool";
+                        p.CppType = _XORSTR_("bool");
                     }
                     switch (p.ParamType) {
                     case GeneratorParameter::Type::Default:
                         if (Prop.GetArrayDim() > 1) {
-                            p.CppType = p.CppType + "*";
+                            p.CppType = p.CppType + '*';
                         } else if (ParamInfo.CanBeReference) {
                             p.PassByReference = true;
                         }
@@ -234,8 +233,8 @@ void GeneratorPackage::GenerateMethods(const ClassProxy& ClassObj, std::vector<G
 GeneratorMember CreatePadding(size_t id, int32_t offset, int32_t size, std::string reason)
 {
     GeneratorMember m;
-    m.Name = tfm::format("UnknownData%02d[0x%X]", id, size);
-    m.Type = "uint8_t";
+    m.Name = tfm::format(_XOR_("UnknownData%02d[0x%X]"), id, size);
+    m.Type = _XORSTR_("uint8_t");
     m.Offset = offset;
     m.Size = size;
     m.Comment = std::move(reason);
@@ -245,7 +244,7 @@ GeneratorMember CreatePadding(size_t id, int32_t offset, int32_t size, std::stri
 GeneratorMember CreateBitfieldPadding(size_t id, int32_t offset, std::string type, size_t bits)
 {
     GeneratorMember m;
-    m.Name = tfm::format("UnknownData%02d : %d", id, bits);
+    m.Name = tfm::format(_XOR_("UnknownData%02d : %d"), id, bits);
     m.Type = std::move(type);
     m.Offset = offset;
     m.Size = 1;
@@ -263,7 +262,7 @@ void GeneratorPackage::GenerateMembers(const StructProxy& Struct, int32_t Offset
             PreviousBitfieldProperty = BoolPropertyProxy(nullptr);
 
             const auto size = Prop.GetOffset() - Offset;
-            Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, size, "MISSED OFFSET"));
+            Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, size, _XORSTR_("MISSED OFFSET")));
         }
 
         const PropertyInfo PropInfo = Prop.GetInfo();
@@ -302,7 +301,7 @@ void GeneratorPackage::GenerateMembers(const StructProxy& Struct, int32_t Offset
 
                 PreviousBitfieldProperty = BoolProp;
 
-                sp.Name += " : 1";
+                sp.Name += _XORSTR_(" : 1");
             } else {
                 PreviousBitfieldProperty = BoolPropertyProxy(nullptr);
             }
@@ -314,11 +313,11 @@ void GeneratorPackage::GenerateMembers(const StructProxy& Struct, int32_t Offset
 
             const auto sizeMismatch = static_cast<int>(Prop.GetElementSize() * Prop.GetArrayDim()) - static_cast<int>(PropInfo.Size * Prop.GetArrayDim());
             if (sizeMismatch > 0) {
-                Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, sizeMismatch, "FIX WRONG TYPE SIZE OF PREVIOUS PROPERTY"));
+                Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, sizeMismatch, _XORSTR_("FIX WRONG TYPE SIZE OF PREVIOUS PROPERTY")));
             }
         } else {
             const int32_t size = Prop.GetElementSize() * Prop.GetArrayDim();
-            Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, size, "UNKNOWN PROPERTY: " + Prop.GetFullName()));
+            Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, size, _XORSTR_("UNKNOWN PROPERTY: ") + Prop.GetFullName()));
         }
 
         Offset = Prop.GetOffset() + Prop.GetElementSize() * Prop.GetArrayDim();
@@ -326,7 +325,7 @@ void GeneratorPackage::GenerateMembers(const StructProxy& Struct, int32_t Offset
 
     if (Offset < Struct.GetPropertiesSize()) {
         const int32_t size = Struct.GetPropertiesSize() - Offset;
-        Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, size, "MISSED OFFSET"));
+        Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, size, _XORSTR_("MISSED OFFSET")));
     }
 }
 
@@ -339,7 +338,7 @@ void GeneratorPackage::GenerateClass(const ClassProxy& ClassObj)
     LOG_DBG_PRINT("Class:          %-98s - instance: 0x%p\n", c.FullName.c_str(), ClassObj.GetAddress());
 
     c.NameCpp = MakeValidName(ClassObj.GetNameCPP());
-    c.NameCppFull = "class " + c.NameCpp;
+    c.NameCppFull = _XORSTR_("class ") + c.NameCpp;
 
     c.Size = ClassObj.GetPropertiesSize();
     c.InheritedSize = 0;
@@ -349,7 +348,7 @@ void GeneratorPackage::GenerateClass(const ClassProxy& ClassObj)
     StructProxy SuperStruct = ClassObj.GetSuper();
     if (SuperStruct.IsValid() && SuperStruct != ClassObj) {
         c.InheritedSize = offset = SuperStruct.GetPropertiesSize();
-        c.NameCppFull += " : public " + MakeValidName(SuperStruct.GetNameCPP());
+        c.NameCppFull += _XORSTR_(" : public ") + MakeValidName(SuperStruct.GetNameCPP());
     }
 
     std::vector<PropertyProxy> Props;
@@ -369,8 +368,20 @@ void GeneratorPackage::GenerateClass(const ClassProxy& ClassObj)
     }
     std::sort(std::begin(Props), std::end(Props), ComparePropertyLess);
 
+    // Generate this class object's members/fields.
     GenerateMembers(ClassObj, offset, Props, c.Members);
-    GenerateMethods(ClassObj, c.Methods);
+
+    // Skip BlueprintGeneratedClass types methods since they seem to be neverending.
+    if (c.FullName.find(_XOR_("BlueprintGeneratedClass ")) != std::string::npos) {
+
+        LOG_INFO(_XOR_("BLUEPRINT GENERATED CLASS: %s"), c.Name.c_str());
+
+    } else {
+
+        // Generate this class object's methods.
+        GenerateMethods(ClassObj, c.Methods);
+    }
+
 
     Classes.emplace_back(std::move(c));
 }
@@ -540,7 +551,7 @@ void GeneratorPackage::Process(const ObjectsProxy& Objects, std::unordered_map<c
     for (ObjectProxy Object : Objects) {
         if (Object.IsValid()) {
             const UPackage* Package = Object.GetOutermost();
-            if (PackageObject == Package /*&& Object.GetClass()*/) {
+            if (PackageObject == Package) {
 
                 if (Object.IsA<EnumProxy>()) {
 
@@ -570,11 +581,11 @@ void GeneratorPackage::PrintConstant(std::ostream& os, const std::pair<std::stri
 void GeneratorPackage::PrintEnum(std::ostream& os, const GeneratorEnum& Enum) const
 {
     using namespace cpplinq;
-    os << "// " << Enum.FullName << "\nenum class " << Enum.Name << " : uint8_t\n{\n";
+    os << "// " << Enum.FullName << _XORSTR_("\nenum class ") << Enum.Name << _XORSTR_(" : uint8_t {\n");
     os << (from(Enum.Values)
-           >> select([](auto&& name, auto&& i) { return tfm::format(_XOR_("\t%-30s = %d"), name, i); })
+           >> select([](auto&& name, auto&& i) { return tfm::format(_XOR_("    %-30s = %d"), name, i); })
            >> concatenate(",\n"))
-        << "\n};\n\n";
+        << _XORSTR_("\n};\n\n");
 }
 
 void GeneratorPackage::PrintStruct(std::ostream& os, const GeneratorScriptStruct& ScriptStruct) const
@@ -583,16 +594,16 @@ void GeneratorPackage::PrintStruct(std::ostream& os, const GeneratorScriptStruct
 
     os << "// " << ScriptStruct.FullName << "\n// ";
     if (ScriptStruct.InheritedSize) {
-        os << tfm::format("0x%04X (0x%04X - 0x%04X)\n", ScriptStruct.Size - ScriptStruct.InheritedSize, ScriptStruct.Size, ScriptStruct.InheritedSize);
+        os << tfm::format(_XOR_("0x%04X (0x%04X - 0x%04X)\n"), ScriptStruct.Size - ScriptStruct.InheritedSize, ScriptStruct.Size, ScriptStruct.InheritedSize);
     } else {
-        os << tfm::format("0x%04X\n", ScriptStruct.Size);
+        os << tfm::format(_XOR_("0x%04X\n"), ScriptStruct.Size);
     }
     os << ScriptStruct.NameCppFull << " {\n";
 
     // Members
     os << (from(ScriptStruct.Members)
         >> select([](auto&& m) {
-            return tfm::format(_XOR_("\t%-50s %-58s// 0x%04X(0x%04X)"), m.Type, m.Name + ";", m.Offset, m.Size) +
+            return tfm::format(_XOR_("    %-50s %-58s// 0x%04X(0x%04X)"), m.Type, m.Name + ";", m.Offset, m.Size) +
                     (!m.Comment.empty() ? " " + m.Comment : "") +
                     (!m.FlagsString.empty() ? " (" + m.FlagsString + ")" : "");
         }) >> concatenate("\n"))
@@ -618,10 +629,10 @@ std::string BuildMethodSignature(const GeneratorMethod& m, const GeneratorClass&
     } else {
         ss << _XORSTR_("void");
     }
-    ss << " ";
+    ss << ' ';
 
     if (!inHeader) {
-        ss << c.NameCpp << "::";
+        ss << c.NameCpp << _XORSTR_("::");
     }
     if (m.IsStatic) {
         ss << _XORSTR_("STATIC_");
@@ -629,13 +640,13 @@ std::string BuildMethodSignature(const GeneratorMethod& m, const GeneratorClass&
     ss << m.Name;
 
     // Parameters
-    ss << "(";
+    ss << '(';
     ss << (from(m.Parameters)
            >> where([](auto&& param) { return param.ParamType != GeneratorParameter::Type::Return; })
            >> orderby([](auto&& param) { return param.ParamType; })
            >> select([](auto&& param) { return (param.PassByReference ? "const " : "") + param.CppType + (param.PassByReference ? "& " : param.ParamType == GeneratorParameter::Type::Out ? "* " : " ") + param.Name; })
            >> concatenate(", "));
-    ss << ")";
+    ss << ')';
 
     return ss.str();
 }
@@ -647,68 +658,64 @@ std::string BuildMethodBody(const GeneratorClass& c, const GeneratorMethod& m)
     std::ostringstream ss;
 
     // Function Pointer
-    ss << "{\n\tstatic auto fn";
+    ss << _XORSTR_("{\n    /*static*/ auto fn");
 
-    //if (generator->ShouldUseStrings()) {
+//if (generator->ShouldUseStrings()) {
     ss << _XORSTR_(" = UObject::FindObject<UFunction>(");
-    ss << "\"" << m.FullName << "\"";
-    ss << ");\n\n";
+    ss << '\"' << m.FullName << '\"';
+    ss << _XORSTR_(");\n\n");
 //} else {
-//    ss << " = UObject::GetObjectCasted<UFunction>(" << m.Index << ");\n\n";
+//    ss << _XORSTR_(" = UObject::GetObjectCasted<UFunction>(") << m.Index << _XORSTR_(");\n\n");
 //}
 
-// Parameters
-    ss << "\tstruct\n\t{\n";
+    // Parameters
+    ss << _XORSTR_("    struct {\n");
     for (auto&& param : m.Parameters) {
-        tfm::format(ss, "\t\t%-30s %s;\n", param.CppType, param.Name);
+        tfm::format(ss, _XOR_("        %-30s %s;\n"), param.CppType, param.Name);
     }
-    ss << "\t} params;\n";
+    ss << _XORSTR_("    } params;\n");
 
     auto defaultParameters = from(m.Parameters) >> where([](auto&& param) { return param.ParamType == GeneratorParameter::Type::Default; });
     if (defaultParameters >> any()) {
         for (auto&& param : defaultParameters >> experimental::container()) {
-            ss << "\tparams." << param.Name << " = " << param.Name << ";\n";
+            ss << _XORSTR_("    params.") << param.Name << " = " << param.Name << ";\n";
         }
     }
-
-    ss << "\n";
+    ss << '\n';
 
     // Function Call
-    ss << _XORSTR_("\tauto flags = fn->FunctionFlags;\n");
+    ss << _XORSTR_("    uint32_t flags = fn->FunctionFlags;\n");
     if (m.IsNative) {
-        ss << "\tfn->FunctionFlags |= 0x" <<
-            tfm::format("%X", static_cast<std::underlying_type_t<FunctionFlags>>(FunctionFlags::Native)) << ";\n";
+        ss << _XORSTR_("    fn->FunctionFlags |= 0x") <<
+            tfm::format("%X", static_cast<uint32_t>(FunctionFlags::Native)) << _XORSTR_("; /*Native*/\n");
     }
-
-    ss << "\n";
+    ss << '\n';
 
     if (m.IsStatic) {
-        ss << _XORSTR_("\tstatic auto DefaultObj = StaticClass()->CreateDefaultObject();\n");
-        ss << _XORSTR_("\tDefaultObj->ProcessEvent(fn, &params);\n\n");
+        ss << _XORSTR_("    /*static*/ auto DefaultObj = StaticClass()->CreateDefaultObject();\n");
+        ss << _XORSTR_("    DefaultObj->ProcessEvent(fn, &params);\n\n");
     } else {
-        ss << _XORSTR_("\tUObject::ProcessEvent(fn, &params);\n\n");
+        ss << _XORSTR_("    UObject::ProcessEvent(fn, &params);\n\n");
     }
-
-    ss << "\tfn->FunctionFlags = flags;\n";
+    ss << _XORSTR_("    fn->FunctionFlags = flags;\n");
 
     // Out Parameters
     auto out = from(m.Parameters) >> where([](auto&& param) { return param.ParamType == GeneratorParameter::Type::Out; });
     if (out >> any()) {
-        ss << "\n";
-
+        ss << '\n';
         for (auto&& param : out >> experimental::container()) {
-            ss << "\tif (" << param.Name << " != nullptr)\n";
-            ss << "\t\t*" << param.Name << " = params." << param.Name << ";\n";
+            ss << _XORSTR_("    if (") << param.Name << _XORSTR_(" != nullptr)\n");
+            ss << _XORSTR_("        *") << param.Name << _XORSTR_(" = params.") << param.Name << ";\n";
         }
     }
 
     // Return Value
     auto retn = from(m.Parameters) >> where([](auto&& param) { return param.ParamType == GeneratorParameter::Type::Return; });
     if (retn >> any()) {
-        ss << "\n\treturn params." << (retn >> first()).Name << ";\n";
+        ss << _XORSTR_("\n    return params.") << (retn >> first()).Name << ";\n";
     }
 
-    ss << "}\n";
+    ss << _XORSTR_("}\n");
 
     return ss.str();
 }
@@ -719,34 +726,35 @@ void GeneratorPackage::PrintClass(std::ostream& os, const GeneratorClass& Class)
 
     os << "// " << Class.FullName << "\n// ";
     if (Class.InheritedSize) {
-        tfm::format(os, "0x%04X (0x%04X - 0x%04X)\n", Class.Size - Class.InheritedSize, Class.Size, Class.InheritedSize);
+        tfm::format(os, _XOR_("0x%04X (0x%04X - 0x%04X)\n"),
+                    Class.Size - Class.InheritedSize, Class.Size, Class.InheritedSize);
     } else {
-        tfm::format(os, "0x%04X\n", Class.Size);
+        tfm::format(os, _XOR_("0x%04X\n"), Class.Size);
     }
 
     os << Class.NameCppFull << " {\npublic:\n";
 
     // Members
     for (auto&& m : Class.Members) {
-        tfm::format(os, "\t%-50s %-58s// 0x%04X(0x%04X)", m.Type, m.Name + ";", m.Offset, m.Size);
+        tfm::format(os, _XOR_("    %-50s %-58s// 0x%04X(0x%04X)"), m.Type, m.Name + ';', m.Offset, m.Size);
         if (!m.Comment.empty()) {
             os << " " << m.Comment;
         }
         if (!m.FlagsString.empty()) {
-            os << " (" << m.FlagsString << ")";
+            os << " (" << m.FlagsString << ')';
         }
-        os << "\n";
+        os << '\n';
     }
 
     // Methods
     if (!Class.Methods.empty()) {
-        os << "\n";
+        os << '\n';
         for (auto&& m : Class.Methods) {
-            os << "\t" << BuildMethodSignature(m, {}, true) << ";\n";
+            os << _XORSTR_("    ") << BuildMethodSignature(m, {}, true) << ";\n";
         }
     }
 
-    os << "};\n\n";
+    os << _XORSTR_("};\n\n");
 }
 
 void GeneratorPackage::SaveStructs(const std::experimental::filesystem::path& path) const
@@ -755,7 +763,7 @@ void GeneratorPackage::SaveStructs(const std::experimental::filesystem::path& pa
 
     std::ofstream os(path / GenerateFileName(FileContentType::Structs, *this));
 
-    std::vector<std::string> includes{ { tfm::format("PUBG_Basic.hpp") } };
+    std::vector<std::string> includes{ { tfm::format(_XOR_("PUBG_Basic.h")) } };
 
     auto dependencyNames = from(DependencyObjects)
         >> select([](auto&& p) { return GenerateFileName(FileContentType::Classes, GeneratorPackage(p)); })
@@ -766,25 +774,26 @@ void GeneratorPackage::SaveStructs(const std::experimental::filesystem::path& pa
     PrintFileHeader(os, includes, true);
 
     if (!Constants.empty()) {
-        PrintSectionHeader(os, "Constants");
+        PrintSectionHeader(os, _XOR_("Constants"));
         for (auto&& c : Constants) {
             PrintConstant(os, c);
         }
-        os << "\n";
+        os << '\n';
     }
 
     if (!Enums.empty()) {
-        PrintSectionHeader(os, "Enums");
+        PrintSectionHeader(os, _XOR_("Enums"));
         for (auto&& e : Enums) {
-            PrintEnum(os, e); os << "\n";
+            PrintEnum(os, e); os << '\n';
         }
-        os << "\n";
+        os << '\n';
     }
 
     if (!ScriptStructs.empty()) {
-        PrintSectionHeader(os, "Script Structs");
+        PrintSectionHeader(os, _XOR_("Script Structs"));
         for (auto&& s : ScriptStructs) {
-            PrintStruct(os, s); os << "\n";
+            PrintStruct(os, s);
+            os << '\n';
         }
     }
 
@@ -798,8 +807,11 @@ void GeneratorPackage::SaveClasses(const std::experimental::filesystem::path& pa
     PrintFileHeader(os, { GenerateFileName(FileContentType::Structs, *this) }, true);
 
     if (!Classes.empty()) {
-        PrintSectionHeader(os, "Classes");
-        for (auto&& c : Classes) { PrintClass(os, c); os << "\n"; }
+        PrintSectionHeader(os, _XOR_("Classes"));
+        for (auto&& c : Classes) {
+            PrintClass(os, c);
+            os << '\n';
+        }
     }
 
     PrintFileFooter(os);
@@ -811,21 +823,21 @@ void GeneratorPackage::SaveFunctions(const std::experimental::filesystem::path& 
 
     PrintFileHeader(os, { GenerateFileName(FileContentType::FunctionParameters, *this) }, false);
 
-    PrintSectionHeader(os, "Functions");
+    PrintSectionHeader(os, _XOR_("Functions"));
 
     for (auto&& c : Classes) {
         for (auto&& m : c.Methods) {
             //Method Info
-            os << "// " << m.FullName << "\n"
+            os << "// " << m.FullName << '\n'
                 << "// (" << m.FlagsString << ")\n";
             if (!m.Parameters.empty()) {
-                os << "// Parameters:\n";
+                os << _XORSTR_("// Parameters:\n");
                 for (auto&& param : m.Parameters) {
-                    tfm::format(os, "// %-30s %-30s (%s)\n", param.CppType, param.Name, param.FlagsString);
+                    tfm::format(os, _XOR_("// %-30s %-30s (%s)\n"), param.CppType, param.Name, param.FlagsString);
                 }
             }
-            os << "\n";
-            os << BuildMethodSignature(m, c, false) << "\n";
+            os << '\n';
+            os << BuildMethodSignature(m, c, false) << '\n';
             os << BuildMethodBody(c, m) << "\n\n";
         }
     }
@@ -839,7 +851,7 @@ bool GeneratorPackage::Save(const std::experimental::filesystem::path& path) con
 
     if ((from(Enums) >> where([](auto&& e) { return !e.Values.empty(); }) >> any()
          || from(ScriptStructs) >> where([](auto&& s) { return !s.Members.empty(); }) >> any()
-         || from(Classes) >> where([](auto&& c) {return !c.Members.empty() || !c.Methods.empty(); }) >> any())
+         || from(Classes) >> where([](auto&& c) { return !c.Members.empty() || !c.Methods.empty(); }) >> any())
         ) {
         SaveStructs(path);
         SaveClasses(path);
@@ -857,24 +869,24 @@ void GeneratorSaveSdkHeader(
     const std::vector<std::unique_ptr<GeneratorPackage>>& Packages
 )
 {
-    std::ofstream os(Path / "SDK.hpp");
-    os << "#pragma once\n\n" << tfm::format("// UE4 SDK\n\n");
+    std::ofstream os(Path / "SDK.h");
+    os << _XORSTR_("#pragma once\n\n") << tfm::format(_XOR_("// UE4 SDK\n\n"));
 
     using namespace cpplinq;
 
     //check for missing structs
     const auto missing = from(ProcessedObjects) >> where([](auto&& kv) { return kv.second == false; });
     if (missing >> any()) {
-        std::ofstream os2(Path / "SDK" / tfm::format("PUBG_MISSING.hpp"));
+        std::ofstream os2(Path / "SDK" / tfm::format(_XOR_("PUBG_MISSING.h")));
         PrintFileHeader(os2, true);
         for (auto&& s : missing >> select([](auto&& kv) { return ObjectProxy(kv.first).Cast<StructProxy>(); }) >> experimental::container()) {
             os2 << "// " << s.GetFullName() << "\n// ";
             os2 << tfm::format("0x%04X\n", s.GetPropertiesSize());
-            os2 << "struct " << MakeValidName(s.GetNameCPP()) << "\n{\n";
-            os2 << "\tuint8_t UnknownData[0x" << tfm::format("%X", s.GetPropertiesSize()) << "];\n};\n\n";
+            os2 << _XORSTR_("struct ") << MakeValidName(s.GetNameCPP()) << "\n{\n";
+            os2 << _XORSTR_("    uint8_t UnknownData[0x") << tfm::format("%X", s.GetPropertiesSize()) << _XORSTR_("];\n};\n\n");
         }
         PrintFileFooter(os2);
-        os << "\n#include \"SDK/" << tfm::format("PUBG_MISSING.hpp") << "\"\n";
+        os << "\n#include \"SDK/" << tfm::format(_XOR_("PUBG_MISSING.h")) << "\"\n";
     }
 
     os << "\n";
