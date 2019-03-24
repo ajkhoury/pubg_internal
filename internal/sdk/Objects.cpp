@@ -19,6 +19,9 @@ DEFINE_STATIC_CLASS(Class);
 ObjectProxy ObjectIterator::operator*() const { return ObjectsProxy().GetById(Index); }
 ObjectProxy ObjectIterator::operator->() const { return ObjectsProxy().GetById(Index); }
 
+std::unordered_map<std::string, int32_t> ObjectsProxy::ObjectsCacheMap;
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif

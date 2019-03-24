@@ -23,15 +23,15 @@ void PrintFileHeader(std::ostream& os, const std::vector<std::string>& includes,
         os << _XORSTR_("#pragma once\n\n");
     }
 
-    os << tfm::format(_XOR_("// PUBG SDK\n\n"))
+    os << tfm::format(_XOR_("// PUBG UE4 SDK\n\n"))
        << tfm::format(_XOR_("#ifdef _MSC_VER\n#pragma pack(push, %d)\n#endif\n\n"), sizeof(size_t));
 
     if (!includes.empty()) {
         for (auto&& i : includes) {
-            if (i[0] != '<' && i[0] != '"') {
-                os << "#include \"" << i << "\"\n";
+            if (i[0] != '<' && i[0] != '\"') {
+                os << _XORSTR_("#include \"") << i << "\"\n";
             } else {
-                os << "#include " << i << '\n';
+                os << _XORSTR_("#include ") << i << '\n';
             }
         }
         os << '\n';
@@ -55,7 +55,7 @@ void PrintSectionHeader(std::ostream& os, const char* name)
         << _XORSTR_("//---------------------------------------------------------------------------\n\n");
 }
 
-std::string GenerateFileName(const FileContentType type, const GeneratorPackage& Package)
+std::string GenerateFileName(const FileContentType type, const UPackage* PackageObject)
 {
     const char* name;
     switch (type) {
@@ -75,7 +75,7 @@ std::string GenerateFileName(const FileContentType type, const GeneratorPackage&
         assert(false);
     }
 
-    return tfm::format(name, _XOR_("PUBG"), Package.GetName());
+    return tfm::format(name, _XOR_("PUBG"), ObjectProxy(PackageObject).GetName());
 }
 
 bool GeneratorParameter::MakeType(PropertyFlags flags, GeneratorParameter::Type& type)
@@ -189,7 +189,6 @@ void GeneratorPackage::GenerateMethods(const ClassProxy& ClassObj, std::vector<G
                         Unique[p.Name] = 1;
                     } else {
                         ++Unique[p.Name];
-
                         p.Name += tfm::format("%02d", it->second);
                     }
 
@@ -373,15 +372,11 @@ void GeneratorPackage::GenerateClass(const ClassProxy& ClassObj)
 
     // Skip BlueprintGeneratedClass types methods since they seem to be neverending.
     if (c.FullName.find(_XOR_("BlueprintGeneratedClass ")) != std::string::npos) {
-
         LOG_INFO(_XOR_("BLUEPRINT GENERATED CLASS: %s"), c.Name.c_str());
-
     } else {
-
         // Generate this class object's methods.
         GenerateMethods(ClassObj, c.Methods);
     }
-
 
     Classes.emplace_back(std::move(c));
 }
@@ -508,7 +503,7 @@ void GeneratorPackage::GeneratePrerequisites(const ObjectProxy& Obj, std::unorde
         return;
     }
 
-    ProcessedObjects[Obj.GetReference()] |= false;
+    ProcessedObjects[Obj.GetConstPtr()] |= false;
 
     const UPackage* ClassPackage = Obj.GetOutermost();
     if (!ClassPackage) {
@@ -519,8 +514,8 @@ void GeneratorPackage::GeneratePrerequisites(const ObjectProxy& Obj, std::unorde
         return;
     }
 
-    if (ProcessedObjects[Obj.GetReference()] == false) {
-        ProcessedObjects[Obj.GetReference()] = true;
+    if (ProcessedObjects[Obj.GetConstPtr()] == false) {
+        ProcessedObjects[Obj.GetConstPtr()] = true;
 
         if (!isScriptStruct) {
             ObjectProxy Outer = Obj.GetOuter();
@@ -598,18 +593,18 @@ void GeneratorPackage::PrintStruct(std::ostream& os, const GeneratorScriptStruct
     } else {
         os << tfm::format(_XOR_("0x%04X\n"), ScriptStruct.Size);
     }
-    os << ScriptStruct.NameCppFull << " {\n";
+    os << ScriptStruct.NameCppFull << _XORSTR_(" {\n");
 
     // Members
     os << (from(ScriptStruct.Members)
         >> select([](auto&& m) {
-            return tfm::format(_XOR_("    %-50s %-58s// 0x%04X(0x%04X)"), m.Type, m.Name + ";", m.Offset, m.Size) +
+            return tfm::format(_XOR_("    %-50s %-58s// 0x%04X(0x%04X)"), m.Type, m.Name + ';', m.Offset, m.Size) +
                     (!m.Comment.empty() ? " " + m.Comment : "") +
-                    (!m.FlagsString.empty() ? " (" + m.FlagsString + ")" : "");
+                    (!m.FlagsString.empty() ? " (" + m.FlagsString + ')' : "");
         }) >> concatenate("\n"))
-        << "\n";
+        << '\n';
 
-    os << "};\n";
+    os << _XORSTR_("};\n");
 }
 
 std::string BuildMethodSignature(const GeneratorMethod& m, const GeneratorClass& c, bool inHeader)
@@ -644,7 +639,7 @@ std::string BuildMethodSignature(const GeneratorMethod& m, const GeneratorClass&
     ss << (from(m.Parameters)
            >> where([](auto&& param) { return param.ParamType != GeneratorParameter::Type::Return; })
            >> orderby([](auto&& param) { return param.ParamType; })
-           >> select([](auto&& param) { return (param.PassByReference ? "const " : "") + param.CppType + (param.PassByReference ? "& " : param.ParamType == GeneratorParameter::Type::Out ? "* " : " ") + param.Name; })
+           >> select([](auto&& param) { return (param.PassByReference ? _XOR_("const ") : "") + param.CppType + (param.PassByReference ? "& " : param.ParamType == GeneratorParameter::Type::Out ? "* " : " ") + param.Name; })
            >> concatenate(", "));
     ss << ')';
 
@@ -705,14 +700,14 @@ std::string BuildMethodBody(const GeneratorClass& c, const GeneratorMethod& m)
         ss << '\n';
         for (auto&& param : out >> experimental::container()) {
             ss << _XORSTR_("    if (") << param.Name << _XORSTR_(" != nullptr)\n");
-            ss << _XORSTR_("        *") << param.Name << _XORSTR_(" = params.") << param.Name << ";\n";
+            ss << _XORSTR_("        *") << param.Name << _XORSTR_(" = params.") << param.Name << _XORSTR_(";\n");
         }
     }
 
     // Return Value
     auto retn = from(m.Parameters) >> where([](auto&& param) { return param.ParamType == GeneratorParameter::Type::Return; });
     if (retn >> any()) {
-        ss << _XORSTR_("\n    return params.") << (retn >> first()).Name << ";\n";
+        ss << _XORSTR_("\n    return params.") << (retn >> first()).Name << _XORSTR_(";\n");
     }
 
     ss << _XORSTR_("}\n");
@@ -731,8 +726,7 @@ void GeneratorPackage::PrintClass(std::ostream& os, const GeneratorClass& Class)
     } else {
         tfm::format(os, _XOR_("0x%04X\n"), Class.Size);
     }
-
-    os << Class.NameCppFull << " {\npublic:\n";
+    os << Class.NameCppFull << _XORSTR_(" {\npublic:\n");
 
     // Members
     for (auto&& m : Class.Members) {
@@ -750,7 +744,7 @@ void GeneratorPackage::PrintClass(std::ostream& os, const GeneratorClass& Class)
     if (!Class.Methods.empty()) {
         os << '\n';
         for (auto&& m : Class.Methods) {
-            os << _XORSTR_("    ") << BuildMethodSignature(m, {}, true) << ";\n";
+            os << _XORSTR_("    ") << BuildMethodSignature(m, {}, true) << _XORSTR_(";\n");
         }
     }
 
@@ -761,16 +755,12 @@ void GeneratorPackage::SaveStructs(const std::experimental::filesystem::path& pa
 {
     using namespace cpplinq;
 
-    std::ofstream os(path / GenerateFileName(FileContentType::Structs, *this));
-
+    std::ofstream os(path / GenerateFileName(FileContentType::Structs, GetPackageObject()));
     std::vector<std::string> includes{ { tfm::format(_XOR_("PUBG_Basic.h")) } };
-
     auto dependencyNames = from(DependencyObjects)
-        >> select([](auto&& p) { return GenerateFileName(FileContentType::Classes, GeneratorPackage(p)); })
+        >> select([](auto&& p) { return GenerateFileName(FileContentType::Classes, p); })
         >> experimental::container();
-
     includes.insert(includes.end(), std::begin(dependencyNames), std::end(dependencyNames));
-
     PrintFileHeader(os, includes, true);
 
     if (!Constants.empty()) {
@@ -802,9 +792,8 @@ void GeneratorPackage::SaveStructs(const std::experimental::filesystem::path& pa
 
 void GeneratorPackage::SaveClasses(const std::experimental::filesystem::path& path) const
 {
-    std::ofstream os(path / GenerateFileName(FileContentType::Classes, *this));
-
-    PrintFileHeader(os, { GenerateFileName(FileContentType::Structs, *this) }, true);
+    std::ofstream os(path / GenerateFileName(FileContentType::Classes, GetPackageObject()));
+    PrintFileHeader(os, { GenerateFileName(FileContentType::Structs, GetPackageObject()) }, true);
 
     if (!Classes.empty()) {
         PrintSectionHeader(os, _XOR_("Classes"));
@@ -819,17 +808,30 @@ void GeneratorPackage::SaveClasses(const std::experimental::filesystem::path& pa
 
 void GeneratorPackage::SaveFunctions(const std::experimental::filesystem::path& path) const
 {
-    std::ofstream os(path / GenerateFileName(FileContentType::Functions, *this));
-
-    PrintFileHeader(os, { GenerateFileName(FileContentType::FunctionParameters, *this) }, false);
-
+    //SaveFunctionParameters(path);
+    std::ofstream os(path / GenerateFileName(FileContentType::Functions, GetPackageObject()));
+    PrintFileHeader(os, { GenerateFileName(FileContentType::Classes, GetPackageObject()) }, false);
     PrintSectionHeader(os, _XOR_("Functions"));
 
+    for (auto&& s : ScriptStructs) {
+        // Predefined struct methods.
+        for (auto&& m : s.PredefinedMethods) {
+            if (m.MethodType != GeneratorPredefinedMethod::Type::Inline) {
+                os << m.Body << "\n\n";
+            }
+        }
+    }
+
     for (auto&& c : Classes) {
+        // Predefined class methods.
+        for (auto&& m : c.PredefinedMethods) {
+            if (m.MethodType != GeneratorPredefinedMethod::Type::Inline) {
+                os << m.Body << "\n\n";
+            }
+        }
+        // Generate methods.
         for (auto&& m : c.Methods) {
-            //Method Info
-            os << "// " << m.FullName << '\n'
-                << "// (" << m.FlagsString << ")\n";
+            os << "// " << m.FullName << '\n' << "// (" << m.FlagsString << ")\n";
             if (!m.Parameters.empty()) {
                 os << _XORSTR_("// Parameters:\n");
                 for (auto&& param : m.Parameters) {
@@ -839,6 +841,29 @@ void GeneratorPackage::SaveFunctions(const std::experimental::filesystem::path& 
             os << '\n';
             os << BuildMethodSignature(m, c, false) << '\n';
             os << BuildMethodBody(c, m) << "\n\n";
+        }
+    }
+
+    PrintFileFooter(os);
+}
+
+void GeneratorPackage::SaveFunctionParameters(const std::experimental::filesystem::path& path) const
+{
+    using namespace cpplinq;
+
+    std::ofstream os(path / GenerateFileName(FileContentType::FunctionParameters, GetPackageObject()));
+
+    PrintFileHeader(os, { _XORSTR_("\"../sdk.h\"") }, true);
+    PrintSectionHeader(os, _XOR_("Parameters"));
+
+    for (auto&& c : Classes) {
+        for (auto&& m : c.Methods) {
+            os << "// " << m.FullName << "\n";
+            tfm::format(os, "struct %s_%s_Params\n{\n", c.NameCpp, m.Name);
+            for (auto&& param : m.Parameters) {
+                tfm::format(os, "\t%-50s %-58s// (%s)\n", param.CppType, param.Name + ";", param.FlagsString);
+            }
+            os << "};\n\n";
         }
     }
 
@@ -869,29 +894,28 @@ void GeneratorSaveSdkHeader(
     const std::vector<std::unique_ptr<GeneratorPackage>>& Packages
 )
 {
-    std::ofstream os(Path / "SDK.h");
-    os << _XORSTR_("#pragma once\n\n") << tfm::format(_XOR_("// UE4 SDK\n\n"));
+    std::ofstream os(Path / "sdk.h");
+    os << _XORSTR_("#pragma once\n\n") << tfm::format(_XOR_("// PUBG UE4 SDK\n\n"));
 
     using namespace cpplinq;
 
     //check for missing structs
     const auto missing = from(ProcessedObjects) >> where([](auto&& kv) { return kv.second == false; });
     if (missing >> any()) {
-        std::ofstream os2(Path / "SDK" / tfm::format(_XOR_("PUBG_MISSING.h")));
+        std::ofstream os2(Path / "gen" / tfm::format(_XOR_("PUBG_MISSING.h")));
         PrintFileHeader(os2, true);
         for (auto&& s : missing >> select([](auto&& kv) { return ObjectProxy(kv.first).Cast<StructProxy>(); }) >> experimental::container()) {
-            os2 << "// " << s.GetFullName() << "\n// ";
+            os2 << "// " << s.GetFullName() << _XORSTR_("\n// ");
             os2 << tfm::format("0x%04X\n", s.GetPropertiesSize());
             os2 << _XORSTR_("struct ") << MakeValidName(s.GetNameCPP()) << "\n{\n";
             os2 << _XORSTR_("    uint8_t UnknownData[0x") << tfm::format("%X", s.GetPropertiesSize()) << _XORSTR_("];\n};\n\n");
         }
         PrintFileFooter(os2);
-        os << "\n#include \"SDK/" << tfm::format(_XOR_("PUBG_MISSING.h")) << "\"\n";
+        os << _XORSTR_("\n#include \"gen/") << tfm::format(_XOR_("PUBG_MISSING.h")) << "\"\n";
     }
-
-    os << "\n";
+    os << '\n';
     for (auto&& Package : Packages) {
-        os << R"(#include "SDK/)" << GenerateFileName(FileContentType::Classes, *Package) << "\"\n";
+        os << _XORSTR_("#include \"gen/") << GenerateFileName(FileContentType::Classes, Package->GetPackageObject()) << "\"\n";
     }
 }
 
@@ -899,7 +923,7 @@ void GeneratorProcessPackages(const std::experimental::filesystem::path& path)
 {
     using namespace cpplinq;
 
-    const auto SdkPath = path / "sdk";
+    const auto SdkPath = path / "gen";
     std::experimental::filesystem::create_directories(SdkPath);
 
     std::vector<std::unique_ptr<GeneratorPackage>> Packages;

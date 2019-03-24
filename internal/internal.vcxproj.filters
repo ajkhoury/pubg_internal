@@ -16,6 +16,9 @@
     <Filter Include="internal\sdk">
       <UniqueIdentifier>{4e310d87-cfeb-4ea3-a820-82ac7b6735bc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="internal\sdk\gen">
+      <UniqueIdentifier>{7bd90fbd-d737-42dc-b4d1-ba746fa5a61b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\native\eresource.c">

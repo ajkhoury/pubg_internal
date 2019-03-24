@@ -38,16 +38,6 @@ struct GeneratorMember {
     std::string Comment;
 };
 
-struct GeneratorScriptStruct {
-    std::string Name;
-    std::string FullName;
-    std::string NameCpp;
-    std::string NameCppFull;
-    int32_t Size;
-    int32_t InheritedSize;
-    std::vector<GeneratorMember> Members;
-};
-
 struct GeneratorParameter {
     enum class Type {
         Default,
@@ -78,6 +68,33 @@ struct GeneratorMethod {
     std::string FlagsString;
     bool IsNative;
     bool IsStatic;
+};
+
+struct GeneratorPredefinedMethod {
+    enum class Type {
+        Default,
+        Inline
+    };
+
+    std::string Signature;
+    std::string Body;
+    Type MethodType;
+
+    // Adds a predefined method which gets split in declaration and definition.
+    static GeneratorPredefinedMethod Default(std::string&& signature, std::string&& body) { return { signature, body, Type::Default }; }
+    // Adds a predefined method which gets included as an inline method.
+    static GeneratorPredefinedMethod Inline(std::string&& body) { return { std::string(), body, Type::Inline }; }
+};
+
+struct GeneratorScriptStruct {
+    std::string Name;
+    std::string FullName;
+    std::string NameCpp;
+    std::string NameCppFull;
+    int32_t Size;
+    int32_t InheritedSize;
+    std::vector<GeneratorMember> Members;
+    std::vector<GeneratorPredefinedMethod> PredefinedMethods;
 };
 
 struct GeneratorClass : GeneratorScriptStruct {
@@ -147,6 +164,8 @@ private:
     void SaveClasses(const std::experimental::filesystem::path& path) const;
     // Writes all functions into the appropriate file.
     void SaveFunctions(const std::experimental::filesystem::path& path) const;
+    // Writes all function parameters into the appropriate file.
+    void SaveFunctionParameters(const std::experimental::filesystem::path& path) const;
 
 
     UPackage* PackageObject;

@@ -101,22 +101,22 @@ public:
 
     inline int32_t GetArrayDim() const
     {
-        return static_cast<const UProperty*>(GetReference())->ArrayDim;
+        return static_cast<const UProperty*>(GetConstPtr())->ArrayDim;
     }
 
     inline int32_t GetElementSize() const
     {
-        return static_cast<const UProperty*>(GetReference())->ElementSize;
+        return static_cast<const UProperty*>(GetConstPtr())->ElementSize;
     }
 
     inline PropertyFlags GetPropertyFlags() const
     {
-        return static_cast<PropertyFlags>(static_cast<const UProperty*>(GetReference())->PropertyFlags);
+        return static_cast<PropertyFlags>(static_cast<const UProperty*>(GetConstPtr())->PropertyFlags);
     }
 
     inline int32_t GetOffset() const
     {
-        return static_cast<const UProperty*>(GetReference())->Offset_Internal;
+        return static_cast<const UProperty*>(GetConstPtr())->Offset_Internal;
     }
 
     PropertyInfo GetInfo() const;
@@ -147,7 +147,7 @@ public:
 
     inline UEnum* GetEnum() const
     {
-        return static_cast<const UByteProperty*>(GetReference())->Enum;
+        return static_cast<const UByteProperty*>(GetConstPtr())->Enum;
     }
 
     inline bool IsEnum() const
@@ -341,22 +341,22 @@ public:
 
     inline uint8_t GetFieldSize() const
     {
-        return static_cast<const UBoolProperty*>(GetReference())->FieldSize;
+        return static_cast<const UBoolProperty*>(GetConstPtr())->FieldSize;
     }
 
     inline uint8_t GetByteOffset() const
     {
-        return static_cast<const UBoolProperty*>(GetReference())->ByteOffset;
+        return static_cast<const UBoolProperty*>(GetConstPtr())->ByteOffset;
     }
 
     inline uint8_t GetByteMask() const
     {
-        return static_cast<const UBoolProperty*>(GetReference())->ByteMask;
+        return static_cast<const UBoolProperty*>(GetConstPtr())->ByteMask;
     }
 
     inline uint8_t GetFieldMask() const
     {
-        return static_cast<const UBoolProperty*>(GetReference())->FieldMask;
+        return static_cast<const UBoolProperty*>(GetConstPtr())->FieldMask;
     }
 
     inline bool IsNativeBool() const
@@ -410,7 +410,7 @@ public:
 
     inline UClass* GetPropertyClass() const
     {
-        return static_cast<const UObjectPropertyBase*>(GetReference())->PropertyClass;
+        return static_cast<const UObjectPropertyBase*>(GetConstPtr())->PropertyClass;
     }
 
     PropertyInfo GetInfo() const
@@ -449,7 +449,7 @@ public:
 
     inline UClass* GetMetaClass() const
     {
-        return static_cast<const UClassProperty*>(GetReference())->MetaClass;
+        return static_cast<const UClassProperty*>(GetConstPtr())->MetaClass;
     }
 
     PropertyInfo GetInfo() const
@@ -471,7 +471,7 @@ public:
 
     inline UClass* GetInterfaceClass() const
     {
-        return static_cast<const UInterfaceProperty*>(GetReference())->InterfaceClass;
+        return static_cast<const UInterfaceProperty*>(GetConstPtr())->InterfaceClass;
     }
 
     PropertyInfo GetInfo() const
@@ -544,7 +544,7 @@ public:
 
     inline UClass* GetMetaClass() const
     {
-        return static_cast<const UAssetClassProperty*>(GetReference())->MetaClass;
+        return static_cast<const UAssetClassProperty*>(GetConstPtr())->MetaClass;
     }
 
     PropertyInfo GetInfo() const
@@ -583,7 +583,7 @@ public:
 
     inline UScriptStruct* GetStruct() const
     {
-        return static_cast<const UStructProperty*>(GetReference())->Struct;
+        return static_cast<const UStructProperty*>(GetConstPtr())->Struct;
     }
 
     PropertyInfo GetInfo() const
@@ -639,7 +639,7 @@ public:
 
     inline UProperty* GetInner() const
     {
-        return static_cast<const UArrayProperty*>(GetReference())->Inner;
+        return static_cast<const UArrayProperty*>(GetConstPtr())->Inner;
     }
 
     PropertyInfo GetInfo() const
@@ -670,12 +670,12 @@ public:
 
     inline UProperty* GetKeyProperty() const
     {
-        return static_cast<const UMapProperty*>(GetReference())->KeyProp;
+        return static_cast<const UMapProperty*>(GetConstPtr())->KeyProp;
     }
 
     inline UProperty* GetValueProperty() const
     {
-        return static_cast<const UMapProperty*>(GetReference())->ValueProp;
+        return static_cast<const UMapProperty*>(GetConstPtr())->ValueProp;
     }
 
     PropertyInfo GetInfo() const
@@ -709,7 +709,7 @@ public:
 
     inline UFunction* GetSignatureFunction() const
     {
-        return static_cast<const UDelegateProperty*>(GetReference())->SignatureFunction;
+        return static_cast<const UDelegateProperty*>(GetConstPtr())->SignatureFunction;
     }
 
     PropertyInfo GetInfo() const
@@ -731,7 +731,7 @@ public:
 
     inline UFunction* GetSignatureFunction() const
     {
-        return static_cast<const UMulticastDelegateProperty*>(GetReference())->SignatureFunction;
+        return static_cast<const UMulticastDelegateProperty*>(GetConstPtr())->SignatureFunction;
     }
 
     PropertyInfo GetInfo() const
@@ -753,12 +753,12 @@ public:
 
     inline UNumericProperty* GetUnderlyingProperty() const
     {
-        return static_cast<const UEnumProperty*>(GetReference())->UnderlyingProp;
+        return static_cast<const UEnumProperty*>(GetConstPtr())->UnderlyingProp;
     }
 
     inline UEnum* GetEnum() const
     {
-        return static_cast<const UEnumProperty*>(GetReference())->Enum;
+        return static_cast<const UEnumProperty*>(GetConstPtr())->Enum;
     }
 
     PropertyInfo GetInfo() const

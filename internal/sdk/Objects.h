@@ -63,7 +63,7 @@ public:
     UObject *GetById(int32_t Index) const;
 
     template<typename T>
-    const T* FindObject(const std::string& name) const;
+    T* FindObject(const std::string& name) const;
 
     template<class T>
     int32_t CountObjects(const std::string& name) const;
@@ -89,6 +89,8 @@ private:
     //inline friend const ObjectIterator end(const ObjectsProxy& Objects) { return ObjectIterator(Objects.GetNum()); }
 
     void *ObjectArray;
+
+    static std::unordered_map<std::string, int32_t> ObjectsCacheMap;
 };
 
 class ObjectProxy {
@@ -106,7 +108,8 @@ public:
     inline ObjectProxy& operator=(UObject* InObject) { Object = InObject; return *this; }
     inline ObjectProxy& operator=(const ObjectProxy& InProxy) { Object = InProxy.Object; return *this; }
 
-    inline const UObject* GetReference() const { return const_cast<const UObject*>(Object); }
+    inline UObject* GetPtr() const { return Object; }
+    inline const UObject* GetConstPtr() const { return const_cast<const UObject*>(Object); }
     inline void *GetAddress() const { return (void *)Object; }
     inline bool IsValid() const { return Object != nullptr; }
 
@@ -127,14 +130,14 @@ public:
     const Type* Get() const
     {
         static_assert(std::is_base_of<UObject, Type>::value == true, "Not a base of UObject!");
-        return static_cast<const Type*>(GetReference());
+        return static_cast<const Type*>(GetConstPtr());
     }
 
     template<typename Type>
     Type* Get()
     {
         static_assert(std::is_base_of<UObject, Type>::value == true, "Not a base of UObject!");
-        return static_cast<Type*>(Object);
+        return static_cast<Type*>(GetPtr());
     }
 
     template<typename ProxyBase>
@@ -173,8 +176,7 @@ private:
 namespace std {
 template<>
 struct hash<ObjectProxy> {
-    size_t operator()(const ObjectProxy& obj) const
-    {
+    size_t operator()(const ObjectProxy& obj) const {
         return std::hash<void*>()(obj.GetAddress());
     }
 };
@@ -184,20 +186,18 @@ inline bool operator==(const ObjectProxy& lhs, const ObjectProxy& rhs) { return 
 inline bool operator!=(const ObjectProxy& lhs, const ObjectProxy& rhs) { return !(lhs == rhs); }
 
 template<typename T>
-const T* ObjectsProxy::FindObject(const std::string& name) const
+T* ObjectsProxy::FindObject(const std::string& name) const
 {
     for (int32_t i = 0; i < GetNum(); ++i) {
         ObjectProxy Object(GetById(i));
         if (Object.IsValid()) {
             if (Object.GetFullName() == name) {
-                return static_cast<const T*>(Object.GetReference());
+                return static_cast<T*>(Object.GetPtr());
             }
         }
     }
     return NULL;
 }
-
-static std::unordered_map<std::string, int32_t> ObjectsCacheMap;
 
 template<class T>
 int32_t ObjectsProxy::CountObjects(const std::string& name) const
@@ -232,7 +232,7 @@ public:
 
     inline UField *GetNext() const
     {
-        return static_cast<const UField*>(GetReference())->Next;
+        return static_cast<const UField*>(GetConstPtr())->Next;
     }
 
     DECLARE_STATIC_CLASS(Field);
@@ -280,22 +280,22 @@ public:
 
     inline UStruct* GetSuper() const
     {
-        return static_cast<const UStruct*>(GetReference())->SuperStruct;
+        return static_cast<const UStruct*>(GetConstPtr())->SuperStruct;
     }
 
     inline UField* GetChildren() const
     {
-        return static_cast<const UStruct*>(GetReference())->Children;
+        return static_cast<const UStruct*>(GetConstPtr())->Children;
     }
 
     inline int32_t GetPropertiesSize() const
     {
-        return static_cast<const UStruct*>(GetReference())->PropertiesSize;
+        return static_cast<const UStruct*>(GetConstPtr())->PropertiesSize;
     }
 
     inline int32_t GetMinAlignment() const
     {
-        return static_cast<const UStruct*>(GetReference())->MinAlignment;
+        return static_cast<const UStruct*>(GetConstPtr())->MinAlignment;
     }
 
     DECLARE_STATIC_CLASS(Struct);
@@ -363,7 +363,7 @@ public:
 
     inline FunctionFlags GetFunctionFlags() const
     {
-        return static_cast<FunctionFlags>(static_cast<const UFunction*>(GetReference())->FunctionFlags);
+        return static_cast<FunctionFlags>(static_cast<const UFunction*>(GetConstPtr())->FunctionFlags);
     }
 
     DECLARE_STATIC_CLASS(Function);
