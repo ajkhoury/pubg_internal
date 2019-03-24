@@ -114,12 +114,12 @@ private:
         return Chunk + WithinChunkIndex;
     }
 
-    uint64_t ChunksEncrypted;
-    uint64_t NumElementsEncrypted;
-    uint64_t NumChunksEncrypted;
+    uint64_t ChunksEncrypted;       // 0x00
+    uint64_t NumElementsEncrypted;  // 0x08
+    uint64_t NumChunksEncrypted;    // 0x10
 };
 
-typedef TStaticIndirectArrayThreadSafeRead<FNameEntry, 2 * 1024 * 1024, 16188> TNameEntryArray;
+typedef TStaticIndirectArrayThreadSafeRead<FNameEntry, 2 * 1024 * 1024, 15888> TNameEntryArray;
 static TNameEntryArray *GNames = NULL;
 
 typedef
@@ -223,20 +223,20 @@ std::string NamesProxy::GetById(int32_t id) const
         
         const FNameEntry *NameEntry = static_cast<TNameEntryArray *>(Names)->GetById(id);
         if (NameEntry) {
-            Str = NameEntry->GetAnsiName();
-            //if (NameEntry->IsWide()) {
-            //
-            //    wchar_t const *WideName = NameEntry->GetWideName();
-            //    int WideNameLen = static_cast<int>(wcslen(WideName));
-            //    int size = WideCharToMultiByte(CP_UTF8, 0, WideName, WideNameLen, NULL, 0, NULL, NULL);
-            //    if (size) {
-            //        Str.resize(size, 0);
-            //        WideCharToMultiByte(CP_UTF8, 0, WideName, WideNameLen, (LPSTR)Str.data(), size, NULL, NULL);
-            //    }
-            //
-            //} else {
-            //    Str = NameEntry->GetAnsiName();
-            //}
+            //Str = NameEntry->GetAnsiName();
+            if (NameEntry->IsWide()) {
+            
+                wchar_t const *WideName = NameEntry->GetWideName();
+                int WideNameLen = static_cast<int>(wcslen(WideName));
+                int size = WideCharToMultiByte(CP_UTF8, 0, WideName, WideNameLen, NULL, 0, NULL, NULL);
+                if (size) {
+                    Str.resize(size, 0);
+                    WideCharToMultiByte(CP_UTF8, 0, WideName, WideNameLen, (LPSTR)Str.data(), size, NULL, NULL);
+                }
+            
+            } else {
+                Str = NameEntry->GetAnsiName();
+            }
         }
     }
 

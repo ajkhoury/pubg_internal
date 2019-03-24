@@ -12,6 +12,7 @@
 #define _XXSTRINGIFY(x) __XXSTRINGIFY(x)
 #define DECLARE_STATIC_CLASS(TClass) \
     static const UClass* StaticClass() { \
+        /* LOG_INFO("StaticClass of " _XXSTRINGIFY(TClass)); */ \
         if (!TClass##Class) \
             TClass##Class = ObjectsProxy().FindClass("Class CoreUObject." _XXSTRINGIFY(TClass)); \
         return TClass##Class; \
@@ -29,35 +30,27 @@ public:
     int32_t SerialNumber; // 0x10
 }; // size=0x18
 
-//class ObjectIterator {
-//public:
-//    ObjectIterator(const int32_t InObjectIndex) : Index(InObjectIndex) {}
-//    ObjectIterator(const ObjectIterator& Other) : Index(Other.Index) {}
-//    ObjectIterator(ObjectIterator&& Other) noexcept : Index(Other.Index) {}
-//
-//    inline ObjectIterator& operator=(const ObjectIterator& rhs)
-//    {
-//        Index = rhs.Index;
-//        return *this;
-//    }
-//
-//    inline void swap(ObjectIterator& Other) noexcept
-//    {
-//        std::swap(Index, Other.Index);
-//    }
-//
-//    inline bool operator==(const ObjectIterator& rhs) const { return Index == rhs.Index; }
-//    inline bool operator!=(const ObjectIterator& rhs) const { return Index != rhs.Index; }
-//
-//    inline ObjectIterator& operator++() { ++Index; return *this; }
-//    inline ObjectIterator operator++(int) { auto tmp(*this); ++(*this); return tmp; }
-//
-//    class ObjectProxy operator*() const;
-//    class ObjectProxy operator->() const;
-//
-//private:
-//    int32_t Index;
-//};
+class ObjectIterator {
+public:
+    ObjectIterator(const int32_t InObjectIndex) : Index(InObjectIndex) {}
+    ObjectIterator(const ObjectIterator& Other) : Index(Other.Index) {}
+    ObjectIterator(ObjectIterator&& Other) noexcept : Index(Other.Index) {}
+
+    inline ObjectIterator& operator=(const ObjectIterator& rhs) { Index = rhs.Index; return *this; }
+    inline void swap(ObjectIterator& Other) noexcept { std::swap(Index, Other.Index); }
+
+    inline bool operator==(const ObjectIterator& rhs) const { return Index == rhs.Index; }
+    inline bool operator!=(const ObjectIterator& rhs) const { return Index != rhs.Index; }
+
+    inline ObjectIterator& operator++() { ++Index; return *this; }
+    inline ObjectIterator operator++(int) { auto tmp(*this); ++(*this); return tmp; }
+
+    class ObjectProxy operator*() const;
+    class ObjectProxy operator->() const;
+
+private:
+    int32_t Index;
+};
 
 class ObjectsProxy {
 public:
@@ -75,13 +68,19 @@ public:
     template<class T>
     int32_t CountObjects(const std::string& name) const;
 
-    inline const UClass* FindClass(const std::string& name) const { return FindObject<UClass>(name); }
+    inline const UClass* FindClass(const std::string& name) const {
+        return FindObject<UClass>(name);
+    }
+
+    inline ObjectIterator begin() { return ObjectIterator(0); }
+    inline const ObjectIterator begin() const { return ObjectIterator(0); }
+    inline ObjectIterator end() { return ObjectIterator(GetNum()); }
+    inline const ObjectIterator end() const { return ObjectIterator(GetNum()); }
 
 private:
     FUObjectItem *GetObjectsPrivate() const;
 
     /**
-     * DO NOT USE DIRECTLY
      * STL-like iterators to enable range-based for loop support.
      */
     //inline friend ObjectIterator begin(ObjectsProxy& Objects) { return ObjectIterator(0); }
@@ -145,15 +144,13 @@ public:
     bool IsA() const
     {
         const UClass* CmpClass = T::StaticClass();
-        if (!CmpClass) {
-            return false;
-        }
-
-        for (UClass* SuperClass = GetClass();
-             SuperClass != nullptr;
-             SuperClass = static_cast<UClass*>(SuperClass->SuperStruct)) {
-            if (SuperClass == CmpClass) {
-                return true;
+        if (CmpClass) {
+            UClass* SuperClass = GetClass();
+            while (SuperClass != nullptr) {
+                if (SuperClass == CmpClass) {
+                    return true;
+                }
+                SuperClass = static_cast<UClass*>(SuperClass->SuperStruct);
             }
         }
 
@@ -190,7 +187,7 @@ template<typename T>
 const T* ObjectsProxy::FindObject(const std::string& name) const
 {
     for (int32_t i = 0; i < GetNum(); ++i) {
-        ObjectProxy Object = GetById(i);
+        ObjectProxy Object(GetById(i));
         if (Object.IsValid()) {
             if (Object.GetFullName() == name) {
                 return static_cast<const T*>(Object.GetReference());

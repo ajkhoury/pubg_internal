@@ -404,16 +404,15 @@ int DumpObjects()
         LOG_ERROR(_XOR_("Failed to find UObjectBaseUtility::GetOutermost!"));
         return ERROR_NOT_FOUND;
     }
+
     // Set the Found address to UObjectBaseUtility::GetOutermost.
     Found = reinterpret_cast<const uint8_t *>(TargetAddress);
-
-    LOG_INFO(_XOR_("UObjectBaseUtility::GetOutermost code = {"));
-    std::string GetOutermostString = utils::FormatBuffer(Found, 256);
-    for (auto Line : utils::SplitString(GetOutermostString, '\n')) {
-        LOG_INFO(Line.c_str());
-    }
-    LOG_INFO(_XOR_("};"));
-
+    //LOG_INFO(_XOR_("UObjectBaseUtility::GetOutermost code = {"));
+    //std::string GetOutermostString = utils::FormatBuffer(Found, 256);
+    //for (auto Line : utils::SplitString(GetOutermostString, '\n')) {
+    //    LOG_INFO(Line.c_str());
+    //}
+    //LOG_INFO(_XOR_("};"));
 
     // Disassemble the UObjectBaseUtility::GetOutermost routine.
     rc = DisDecompose(Found,
@@ -1270,7 +1269,7 @@ int32_t DumpStruct(std::wstring Name,
             // Dump padding field to fill in space, if needed.
             if (LastOffset + LastSize < Offset) {
                 size_t PaddingSize = Offset - (LastOffset + LastSize);
-                LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%X]; // 0x%04X (size=0x%04X)"),
+                LOG_INFO(_XOR_("    uint8_t UnknownData0x%04X[0x%X]; // 0x%04X (size=0x%04X)"),
                          LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
             }
 
@@ -1285,20 +1284,24 @@ int32_t DumpStruct(std::wstring Name,
     // Dump the struct size.
     SizeIter = UnrealObjectSizeMap.find(Name);
     if (SizeIter != UnrealObjectSizeMap.end()) {
+
         StructSize = SizeIter->second;
         if (StructSize > Offset + Size) {
             size_t PaddingSize = StructSize - (Offset + Size);
             LOG_INFO(_XOR_("    uint8_t UnknownData0x%04X[0x%X]; // 0x%04X (size=0x%04X)"),
                      Offset + Size, PaddingSize, Offset + Size, PaddingSize);
         }
+
         LOG_INFO(_XOR_("}; // size=0x%04X"), StructSize, Offset + Size);
+
     } else {
+
         StructSize = Offset + Size;
         LOG_INFO(_XOR_("}; // guessed size=0x%04X"), Offset + Size);
     }
 
     // Dump a C_ASSERT for verification or struct size.
-    LOG_INFO(_XOR_("C_ASSERT(sizeof(%ws) == 0x%X);"), Name.c_str(), StructSize);
+    LOG_INFO(_XOR_("C_ASSERT(sizeof(%ws) == 0x%X);\n"), Name.c_str(), StructSize);
 
     // Return struct size, indicating success.
     return static_cast<int32_t>(StructSize);
@@ -1308,7 +1311,6 @@ int DumpStructs()
 {
     int rc;
     size_t Offset;
-    size_t Size;
     FieldMapType::iterator FieldIter;
     UnrealObjectSizeMapType::iterator SizeIter;
     size_t UObjectSize, UFieldSize, UStructSize, UFunctionSize, UPropertySize, UEnumSize;
@@ -1331,8 +1333,9 @@ int DumpStructs()
     //
     // Dump the UObject fields.
     //
+    Offset = 0;
     std::map<size_t, FieldMapEntry> UObjectFieldMap;
-    UObjectFieldMap[0x00] = FIELD_MAP_ENTRY("VTable", void**);
+    UObjectFieldMap[Offset] = FIELD_MAP_ENTRY("VTable", void**);
     UObjectFieldMap[ObjectFlagsEncryptedOffset] = FIELD_MAP_ENTRY("ObjectFlagsEncrypted", int32_t);
     UObjectFieldMap[ObjectOuterEncryptedOffset] = FIELD_MAP_ENTRY("OuterEncrypted", uint64_t);
     UObjectFieldMap[ObjectInternalIndexEncryptedOffset] = FIELD_MAP_ENTRY("InternalIndexEncrypted", int32_t);
@@ -1348,148 +1351,65 @@ int DumpStructs()
     //
     // Dump the UField fields.
     //
-    LOG_INFO(_XOR_("class UField : public UObject {"));
-    LOG_INFO(_XOR_("public:"));
-
     Offset = UObjectSize;
-    Size = sizeof(void*);
-    LOG_INFO(_XOR_("    UField* Next; // 0x%04x (size=0x%04x)"), Offset, Size);
-
-    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UField"));
-    if (SizeIter != UnrealObjectSizeMap.end()) {
-        UFieldSize = SizeIter->second;
-        if (UFieldSize > Offset + Size) {
-            size_t PaddingSize = UFieldSize - (Offset + Size);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
-        }
-        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UFieldSize, Offset + Size);
-    } else {
-        UFieldSize = Offset + Size;
-        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), UFieldSize);
+    std::map<size_t, FieldMapEntry> UFieldFieldMap;
+    UFieldFieldMap[Offset] = FieldMapEntry(_XOR_("Next"), _XOR_("UField*"), sizeof(void*));
+    std::vector<std::wstring> UFieldInherited;
+    UFieldInherited.push_back(_XORSTR_(L"UObject"));
+    UFieldSize = DumpStruct(_XORSTR_(L"UField"), &UFieldInherited, &UFieldFieldMap);
+    if (UFieldSize <= 0) {
+        LOG_ERROR(_XOR_("Failed to dump UField rc %d"), rc);
+        return rc < 0 ? rc : E_FAIL;
     }
-
 
     //
     // Dump the UStruct fields.
     //
+    Offset = UFieldSize;
     std::map<size_t, FieldMapEntry> UStructFieldMap;
     UStructFieldMap[StructPropertiesSizeOffset] = FIELD_MAP_ENTRY("PropertiesSize", int32_t);
     UStructFieldMap[StructMinAlignmentOffset] = FIELD_MAP_ENTRY("MinAlignment", int32_t);
     UStructFieldMap[StructChildrenOffset] = FieldMapEntry("Children", "UField*", sizeof(void*));
     UStructFieldMap[StructSuperStructOffset] = FieldMapEntry("SuperStruct", "class UStruct*", sizeof(void*));
-    LOG_INFO(_XOR_("class UStruct : public UField {"));
-    LOG_INFO(_XOR_("public:"));
-
-    Offset = UFieldSize;
-    Size = 0;
-    FieldIter = UStructFieldMap.begin();
-    while (FieldIter != UStructFieldMap.end()) {
-        FieldMapEntry Entry = FieldIter->second;
-        size_t LastOffset = Offset; Offset = FieldIter->first;
-        size_t LastSize = Size; Size = Entry.Size;
-        if (LastOffset + LastSize < Offset) {
-            size_t PaddingSize = Offset - (LastOffset + LastSize);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
-        }
-        LOG_INFO(_XOR_("    %s %s; // 0x%04x (size=0x%04x)"), Entry.TypeName, Entry.Name, Offset, Size);
-        ++FieldIter;
-    }
-
-    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UStruct"));
-    if (SizeIter != UnrealObjectSizeMap.end()) {
-        UStructSize = SizeIter->second;
-        if (UStructSize > Offset + Size) {
-            size_t PaddingSize = UStructSize - (Offset + Size);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
-        }
-        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UStructSize, Offset + Size);
-    } else {
-        UStructSize = Offset + Size;
-        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), UStructSize);
+    std::vector<std::wstring> UStructInherited;
+    UStructInherited.push_back(_XORSTR_(L"UField"));
+    UStructSize = DumpStruct(_XORSTR_(L"UStruct"), &UStructInherited, &UStructFieldMap);
+    if (UStructSize <= 0) {
+        LOG_ERROR(_XOR_("Failed to dump UStruct rc %d"), rc);
+        return rc < 0 ? rc : E_FAIL;
     }
 
 
     //
     // Dump the UFunction fields.
     //
+    Offset = UStructSize;
     std::map<size_t, FieldMapEntry> UFunctionFieldMap;
     UFunctionFieldMap[FunctionFlagsOffset] = FIELD_MAP_ENTRY("FunctionFlags", int32_t);
-    LOG_INFO(_XOR_("class UFunction : public UStruct {"));
-    LOG_INFO(_XOR_("public:"));
-
-    Offset = UStructSize;
-    Size = 0;
-    FieldIter = UFunctionFieldMap.begin();
-    while (FieldIter != UFunctionFieldMap.end()) {
-        FieldMapEntry Entry = FieldIter->second;
-        size_t LastOffset = Offset; Offset = FieldIter->first;
-        size_t LastSize = Size; Size = Entry.Size;
-        if (LastOffset + LastSize < Offset) {
-            size_t PaddingSize = Offset - (LastOffset + LastSize);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
-        }
-        LOG_INFO(_XOR_("    %s %s; // 0x%04x (size=0x%04x)"), Entry.TypeName, Entry.Name, Offset, Size);
-        ++FieldIter;
-    }
-
-    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UFunction"));
-    if (SizeIter != UnrealObjectSizeMap.end()) {
-        UFunctionSize = SizeIter->second;
-        if (UFunctionSize > Offset + Size) {
-            size_t PaddingSize = UFunctionSize - (Offset + Size);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
-        }
-        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UFunctionSize, Offset + Size);
-    } else {
-        UFunctionSize = Offset + Size;
-        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), UFunctionSize);
+    std::vector<std::wstring> UFunctionInherited;
+    UFunctionInherited.push_back(_XORSTR_(L"UStruct"));
+    UFunctionSize = DumpStruct(_XORSTR_(L"UFunction"), &UFunctionInherited, &UFunctionFieldMap);
+    if (UFunctionSize <= 0) {
+        LOG_ERROR(_XOR_("Failed to dump UFunction rc %d"), rc);
+        return rc < 0 ? rc : E_FAIL;
     }
 
 
     //
     // Dump the UProperty fields.
     //
+    Offset = UFieldSize;
     std::map<size_t, FieldMapEntry> UPropertyFieldMap;
     UPropertyFieldMap[PropertyElementSizeOffset] = FIELD_MAP_ENTRY("ElementSize", int32_t);
     UPropertyFieldMap[PropertyArrayDimOffset] = FIELD_MAP_ENTRY("ArrayDim", int32_t);
     UPropertyFieldMap[PropertyOffset_InternalOffset] = FIELD_MAP_ENTRY("Offset_Internal", int32_t);
     UPropertyFieldMap[PropertyFlagsOffset] = FIELD_MAP_ENTRY("PropertyFlags", uint64_t);
-    LOG_INFO(_XOR_("class UProperty : public UField {"));
-    LOG_INFO(_XOR_("public:"));
-
-    Offset = UFieldSize;
-    Size = 0;
-    FieldIter = UPropertyFieldMap.begin();
-    while (FieldIter != UPropertyFieldMap.end()) {
-        FieldMapEntry Entry = FieldIter->second;
-        size_t LastOffset = Offset; Offset = FieldIter->first;
-        size_t LastSize = Size; Size = Entry.Size;
-        if (LastOffset + LastSize < Offset) {
-            size_t PaddingSize = Offset - (LastOffset + LastSize);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
-        }
-        LOG_INFO(_XOR_("    %s %s; // 0x%04x (size=0x%04x)"), Entry.TypeName, Entry.Name, Offset, Size);
-        ++FieldIter;
-    }
-
-    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UProperty"));
-    if (SizeIter != UnrealObjectSizeMap.end()) {
-        UPropertySize = SizeIter->second;
-        if (UPropertySize > Offset + Size) {
-            size_t PaddingSize = UPropertySize - (Offset + Size);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
-        }
-        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UPropertySize, Offset + Size);
-    } else {
-        UPropertySize = Offset + Size;
-        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), UPropertySize);
+    std::vector<std::wstring> UPropertyInherited;
+    UPropertyInherited.push_back(_XORSTR_(L"UField"));
+    UPropertySize = DumpStruct(_XORSTR_(L"UProperty"), &UPropertyInherited, &UPropertyFieldMap);
+    if (UPropertySize <= 0) {
+        LOG_ERROR(_XOR_("Failed to dump UProperty rc %d"), rc);
+        return rc < 0 ? rc : E_FAIL;
     }
 
 
@@ -1499,37 +1419,12 @@ int DumpStructs()
     std::map<size_t, FieldMapEntry> UEnumFieldMap;
     UEnumFieldMap[EnumNamesOffset] = FieldMapEntry(_XOR_("Names"), _XOR_("TArray<TPair<FName, int64_t>>"), 16);
     UEnumFieldMap[EnumCppFormOffset] = FIELD_MAP_ENTRY("CppForm", int32_t);
-    LOG_INFO(_XOR_("class UEnum : public UField {"));
-    LOG_INFO(_XOR_("public:"));
-
-    Offset = UFieldSize;
-    Size = 0;
-    FieldIter = UEnumFieldMap.begin();
-    while (FieldIter != UEnumFieldMap.end()) {
-        FieldMapEntry Entry = FieldIter->second;
-        size_t LastOffset = Offset; Offset = FieldIter->first;
-        size_t LastSize = Size; Size = Entry.Size;
-        if (LastOffset + LastSize < Offset) {
-            size_t PaddingSize = Offset - (LastOffset + LastSize);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
-        }
-        LOG_INFO(_XOR_("    %s %s; // 0x%04x (size=0x%04x)"), Entry.TypeName, Entry.Name, Offset, Size);
-        ++FieldIter;
-    }
-
-    SizeIter = UnrealObjectSizeMap.find(_XOR_(L"UEnum"));
-    if (SizeIter != UnrealObjectSizeMap.end()) {
-        UEnumSize = SizeIter->second;
-        if (UEnumSize > Offset + Size) {
-            size_t PaddingSize = UEnumSize - (Offset + Size);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04x[0x%x]; // 0x%04x (size=0x%04x)"),
-                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
-        }
-        LOG_INFO(_XOR_("}; // size=0x%04x\n"), UEnumSize, Offset + Size);
-    } else {
-        UEnumSize = Offset + Size;
-        LOG_INFO(_XOR_("}; // guessed size=0x%04x\n"), UEnumSize);
+    std::vector<std::wstring> UEnumInherited;
+    UEnumInherited.push_back(_XORSTR_(L"UField"));
+    UEnumSize = DumpStruct(_XORSTR_(L"UEnum"), &UEnumInherited, &UEnumFieldMap);
+    if (UEnumSize <= 0) {
+        LOG_ERROR(_XOR_("Failed to dump UEnum rc %d"), rc);
+        return rc < 0 ? rc : E_FAIL;
     }
 
     return NOERROR;
@@ -1862,8 +1757,9 @@ int DumpNames()
                 if (NextInst->opcode == I_SUB) {
 
                     // We found the TNameEntryArray::ElementsPerChunk value!
-                    NamesEntryArrayElementsPerChunk = utils::read_bytes(&Inst->imm, Inst->ops[2].size);
-                    LOG_INFO(_XOR_("Found the TNameEntryArray::ElementsPerChunk value: 0x%d"),
+                    NamesEntryArrayElementsPerChunk = utils::read_bytes(&Inst->imm,
+                                                                        Inst->ops[2].size);
+                    LOG_INFO(_XOR_("Found the TNameEntryArray::ElementsPerChunk value: %d"),
                              NamesEntryArrayElementsPerChunk);
 
                     // Skip the next two instructions.
@@ -1940,8 +1836,7 @@ int DumpNames()
         //LOG_INFO(_XOR_("InstIndex = %d"), InstIndex);
     }
 
-    LOG_INFO(_XOR_("LOL DONE"));
-
+    //LOG_INFO(_XOR_("LOL DONE"));
 
     // Output the hueristic search results.
     if (NamesEntryHashNextOffset != -1) {
@@ -2172,6 +2067,8 @@ int DumpNames()
  */
 static size_t WorldEncryptedOffset = -1;
 static int8_t WorldEncryptedRegister = -1;
+static size_t WorldEncryptedStackOffset = -1;
+static int8_t WorldEncryptedStackRegister = -1;
 static uint8_t* WorldDecryptionBegin = nullptr;
 static uint8_t* WorldDecryptionEnd = nullptr;
 
@@ -2186,15 +2083,15 @@ int DumpWorld()
     void* ImageBase = utils::GetModuleHandleWIDE(nullptr /*0xC4D8736D TslGame.exe */);
     uint32_t ImageSize = utils::GetModuleSize((HMODULE)ImageBase);
 
-    // Search for the GWorld decryption inside an unknown routine:
-    // .text:7FF6FCBF16CC                       loc_7FF6FCBF16CC:               ; CODE XREF: GWorldAndGEngineFunction+115^j
-    // .text:7FF6FCBF16CC 48 8B F7              mov     rsi, rdi
-    // .text:7FF6FCBF16CF                       loc_7FF6FCBF16CF:               ; CODE XREF: GWorldAndGEngineFunction+11A^j
-    // .text:7FF6FCBF16CF 48 8B 0D 52 72 16 04  mov     rcx, cs:GWorld
-    // .text:7FF6FCBF16D6 4C 39 2D 23 14 A2 02  cmp     qword ptr cs:aXenuinesdkCarv_95, r13 ; "XENUINESDK_CARVE"
-    // .text:7FF6FCBF16DD 75 1A                 jnz     short loc_7FF6FCBF16F9  ; Decryption starts here
-    // 48 8B F7 48 8B 0D ? ? ? ?
-    Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("48 8B F7 48 8B 0D"));
+    // Search for the GWorld address inside the HandleCSVProfileCommand routine:
+    // .text:7FF6FC3954C7 48 8B D9                  mov     rbx, rcx
+    // .text:7FF6FC3954CA 48 8B 05 57 34 9C 04      mov     rax, cs:GWorld
+    // .text:7FF6FC3954D1 48 89 84 24 80 00 00 00   mov     [rsp+68h+arg_10], rax
+    // .text:7FF6FC3954D9 33 F6                     xor     esi, esi
+    // .text:7FF6FC3954DB 48 39 35 1E 7C 04 03      cmp     qword ptr cs:aXenuinesdkCarv_97, rsi ; "XENUINESDK_CARVE"
+    // .text:7FF6FC3954E2 75 10                     jnz     short loc_7FF6FC3954F4
+    // 48 8B D9 48 8B 05 ? ? ? ? 48 89 84 24 ? ? ? ? 33 F6
+    Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("48 8B D9 48 8B 05 ?? ?? ?? ?? 48 89 84 24 ?? ?? ?? ?? 33 F6"));
     if (!Found) {
         LOG_ERROR(_XOR_("Failed to find GWorld decryption signature!"));
         return ERROR_NOT_FOUND;
@@ -2230,16 +2127,21 @@ int DumpWorld()
 
         // Find the the GWorld register mov instruction which leads to the inline decryption.
         // Search for the GWorld mov instruction:
-        /* mov     rcx, cs:GWorld */
-        /* cmp     qword ptr cs:aXenuinesdkCarv_95, r13 ; "XENUINESDK_CARVE" */
-        /* jnz     short loc_7FF6FCBF16F9 */
-        if (Inst->opcode == I_MOV &&
+        /* mov     rax, cs:GWorld */
+        /* mov     [rsp+80h], rax  */
+        /* xor     esi, esi  */
+        if (InstIndex == 1 &&
+            Inst->opcode == I_MOV &&
             Inst->ops[1].type == O_SMEM &&
-            NextInst->opcode == I_CMP) {
+            NextInst->opcode == I_MOV &&
+            NextInst->ops[0].type == O_SMEM &&
+            Inst->ops[0].index == NextInst->ops[1].index) {
 
             // We found the GWorld offset and register!
             WorldEncryptedOffset = static_cast<size_t>(Inst->disp);
             WorldEncryptedRegister = Inst->ops[0].index;
+            WorldEncryptedStackOffset = static_cast<size_t>(NextInst->disp);
+            WorldEncryptedStackRegister = NextInst->ops[0].index;
 
             // Search for the beginning of the GWorldEncrypted inline decryption:
             INCREMENT_NEXT_INSTRUCTION();
@@ -2261,15 +2163,19 @@ int DumpWorld()
             // Keep iterating next instruction until we hit the end of the decryption.
             INCREMENT_NEXT_INSTRUCTION();
             // Search for the decryption terminating instruction:
-            /* mov     r14, [rbp+Decrypted] */
+            /* mov     rax, [rsp+68h+Decrypted] */
             while (!(NextInst->opcode == I_MOV &&
-                     NextInst->ops[1].type == O_SMEM)) {
+                     NextInst->ops[1].type == O_SMEM &&
+                     NextInst->ops[1].size == sizeof(uint64_t))) {
                 INCREMENT_NEXT_INSTRUCTION();
             }
+            //LOG_INFO(_XOR_("NextInst->ops[1].size: %d  NextInst->dispSize: %d"),
+            //         NextInst->ops[1].size, NextInst->dispSize);
             INCREMENT_NEXT_INSTRUCTION();
             // We found the end of the GWorldEncrypted encryption!
             WorldDecryptionEnd = NextIp;
-            LOG_INFO(_XOR_("Found the GWorldEncrypted decryption ending: 0x%p"), WorldDecryptionEnd);
+            LOG_INFO(_XOR_("Found the GWorldEncrypted decryption ending: 0x%p"),
+                     WorldDecryptionEnd);
 
             // We are done!
             break;
@@ -2286,6 +2192,8 @@ int DumpWorld()
     if (WorldEncryptedOffset != -1) {
         LOG_INFO(_XOR_("GWorld offset = 0x%08x"), WorldEncryptedOffset);
         LOG_INFO(_XOR_("GWorld register = %s"), RegisterStrings[WorldEncryptedRegister]);
+        LOG_INFO(_XOR_("GWorld stack offset = 0x%08x"), WorldEncryptedStackOffset);
+        LOG_INFO(_XOR_("GWorld stack register = %s"), RegisterStrings[WorldEncryptedStackRegister]);
         LOG_INFO(_XOR_("GWorld decryption = {"));
         std::string BufferString = utils::FormatBuffer(WorldDecryptionBegin,
                                                        __MIN(static_cast<size_t>(WorldDecryptionEnd - WorldDecryptionBegin), 1024));

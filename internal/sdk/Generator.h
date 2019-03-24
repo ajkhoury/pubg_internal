@@ -118,7 +118,7 @@ private:
     // Add object to the dependency objects list.
     inline bool AddDependency(const UPackage* Package) const
     {
-        if (Package != PackageObject) {
+        if (Package != nullptr && Package != PackageObject) {
             DependencyObjects.insert(Package);
             return true;
         }

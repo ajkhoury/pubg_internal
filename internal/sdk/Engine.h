@@ -145,11 +145,8 @@ public:
 };
 
 struct FName {
-    FName(int32_t InIndex, int32_t InNumber)
-        : Index(InIndex)
-        , Number(InNumber)
-    {
-    }
+    //FName() : Index(0), Number(0) {}
+    FName(int32_t InIndex, int32_t InNumber) : Index(InIndex), Number(InNumber) {}
 
     inline int32_t GetIndex() const { return Index; }
     inline int32_t GetNumber() const { return Number; }
@@ -237,14 +234,16 @@ struct FScriptMulticastDelegate {
 
 class UObject {
 public:
-    void **VTable; // 0x0000 (size=0x0008)
-    uint64_t ClassEncrypted; // 0x0008 (size=0x0008)
-    int32_t InternalIndexEncrypted; // 0x0010 (size=0x0004)
-    int32_t NameIndexEncrypted; // 0x0014 (size=0x0004)
-    int32_t NameNumberEncrypted; // 0x0018 (size=0x0004)
-    int32_t ObjectFlagsEncrypted; // 0x001c (size=0x0004)
-    uint64_t OuterEncrypted; // 0x0020 (size=0x0008)
+    void** VTable; // 0x0000 (size=0x0008)
+    int32_t NameIndexEncrypted; // 0x0008 (size=0x0004)
+    int32_t NameNumberEncrypted; // 0x000C (size=0x0004)
+    uint64_t OuterEncrypted; // 0x0010 (size=0x0008)
+    int32_t ObjectFlagsEncrypted; // 0x0018 (size=0x0004)
+    int32_t InternalIndexEncrypted; // 0x001C (size=0x0004)
+    uint64_t ClassEncrypted; // 0x0020 (size=0x0008)
 }; // size=0x0028
+C_ASSERT(FIELD_OFFSET(UObject, InternalIndexEncrypted) == 0x1C);
+C_ASSERT(sizeof(UObject) == 0x28);
 
 class UPackage : public UObject {
 public:
@@ -263,6 +262,7 @@ class UField : public UObject {
 public:
     UField* Next; // 0x0028 (size=0x0008)
 }; // size=0x0030
+C_ASSERT(sizeof(UField) == 0x30);
 
 class UEnum : public UField {
 public:
@@ -275,24 +275,17 @@ public:
 }; // size=0x0070
 C_ASSERT(sizeof(UEnum) == 0x70);
 
-//class UEnum : public UField {
-//public:
-//    FString CppType;                        // 0x38
-//    TArray<TPair<FName, int64_t>> Names;    // 0x48
-//    int64_t CppForm;                        // 0x58
-//    void* EnumDisplayNameFn;                // 0x60
-//}; // size=0x78
-
 class UStruct : public UField {
 public:
-    int32_t PropertiesSize; // 0x0030 (size=0x0004)
-    uint8_t UnknownData0x0034[0x4]; // 0x0034 (size=0x0004)
-    UField* Children; // 0x0038 (size=0x0008)
+    uint8_t UnknownData0x0030[0x10]; // 0x0030 (size=0x0010)
     int32_t MinAlignment; // 0x0040 (size=0x0004)
-    uint8_t UnknownData0x0044[0x4]; // 0x0044 (size=0x0004)
-    class UStruct* SuperStruct; // 0x0048 (size=0x0008)
-    uint8_t UnknownData0x0050[0x90]; // 0x0050 (size=0x0090)
-}; // size=0x00e0
+    uint8_t UnknownData0x0044[0x7C]; // 0x0044 (size=0x007C)
+    class UStruct* SuperStruct; // 0x00C0 (size=0x0008)
+    UField* Children; // 0x00C8 (size=0x0008)
+    uint8_t UnknownData0x00D0[0x8]; // 0x00D0 (size=0x0008)
+    int32_t PropertiesSize; // 0x00D8 (size=0x0004)
+    uint8_t UnknownData0x00DC[0x4]; // 0x00DC (size=0x0004)
+}; // size=0x00E0
 C_ASSERT(sizeof(UStruct) == 0xE0);
 
 class UScriptStruct : public UStruct {
@@ -303,11 +296,11 @@ C_ASSERT(sizeof(UScriptStruct) == 0xF0);
 
 class UFunction : public UStruct {
 public:
-    uint8_t UnknownData0x00e0[0x8]; // 0x00e0 (size=0x0008)
-    int32_t FunctionFlags; // 0x00e8 (size=0x0004)
-    uint8_t UnknownData0x00ec[0x3c]; // 0x00ec (size=0x003c)
-}; // size=0x0128
-C_ASSERT(sizeof(UFunction) == 0x0128);
+    uint8_t UnknownData0x00E0[0x38]; // 0x00E0 (size=0x0038)
+    int32_t FunctionFlags; // 0x0118 (size=0x0004)
+    uint8_t UnknownData0x011C[0x14]; // 0x011C (size=0x0014)
+}; // size=0x0130
+C_ASSERT(sizeof(UFunction) == 0x130);
 
 class FClassBaseChain {
 public:
@@ -329,6 +322,7 @@ public:
     int32_t Offset_Internal; // 0x0050 (size=0x0004)
     uint8_t UnknownData0x0054[0x24]; // 0x0054 (size=0x0024)
 }; // size=0x0078
+C_ASSERT(sizeof(UProperty) == 0x78);
 
 class UNumericProperty : public UProperty {
 public:

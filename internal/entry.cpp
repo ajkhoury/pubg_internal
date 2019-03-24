@@ -76,12 +76,6 @@ TestThreadRoutine(
             if (++LoopCount > 5)
                 break;
         }
-
-        ClassProxy UEnumStatic = Objects.FindClass("Class CoreUObject.Enum");
-        if (UEnumStatic.IsValid()) {
-            LOG_DEBUG(_XOR_("UEnumStatic = 0x%p"), UEnumStatic.GetAddress());
-        }
-        
     
         //++NameId;
         //const char *NameData = Names.GetById(NameId);
@@ -93,11 +87,18 @@ TestThreadRoutine(
         //LOG_INFO(_XOR_("NamesData1 = 0x%016llx"), NamesData[1]);
     }
 
-    //for (auto Object : Objects) {
+    //ClassProxy UEnumStatic = Objects.FindClass("Class CoreUObject.Enum");
+    //if (UEnumStatic.IsValid()) {
+    //    LOG_DEBUG(_XOR_("UEnumStatic = 0x%p"), UEnumStatic.GetAddress());
+    //}
+
+    //for (int32_t ObjectIdx = 0; ObjectIdx < Objects.GetNum(); ObjectIdx++) {
+    //    ObjectProxy Object = Objects.GetById(ObjectIdx);
     //    if (Object.IsValid()) {
     //        auto FullName = Object.GetFullName();
     //        if (!FullName.empty()) {
-    //            LOG_INFO(_XOR_("Object[%d] = %s"), Object.GetUniqueId(), FullName.c_str());
+    //            uint32_t uniqueId = Object.GetUniqueId();
+    //            LOG_INFO(_XOR_("Object[%d] = %s"), uniqueId, FullName.c_str());
     //        }
     //    }
     //}

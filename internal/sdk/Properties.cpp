@@ -105,88 +105,145 @@ std::string StringifyFlags(const PropertyFlags Flags)
 PropertyInfo PropertyProxy::GetInfo() const
 {
     if (IsValid()) {
+
+        //LOG_INFO("IsA<BytePropertyProxy>");
         if (IsA<BytePropertyProxy>()) {
+            //LOG_INFO("BytePropertyProxy");
             return Cast<BytePropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<UInt16PropertyProxy>");
         if (IsA<UInt16PropertyProxy>()) {
+            //LOG_INFO("UInt16PropertyProxy");
             return Cast<UInt16PropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<UInt32PropertyProxy>");
         if (IsA<UInt32PropertyProxy>()) {
+            //LOG_INFO("UInt32PropertyProxy");
             return Cast<UInt32PropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<UInt64PropertyProxy>");
         if (IsA<UInt64PropertyProxy>()) {
+            //LOG_INFO("UInt64PropertyProxy");
             return Cast<UInt64PropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<Int8PropertyProxy>");
         if (IsA<Int8PropertyProxy>()) {
+            //LOG_INFO("Int8PropertyProxy");
             return Cast<Int8PropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<Int16PropertyProxy>");
         if (IsA<Int16PropertyProxy>()) {
+            //LOG_INFO("Int16PropertyProxy");
             return Cast<Int16PropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<IntPropertyProxy>");
         if (IsA<IntPropertyProxy>()) {
+            //LOG_INFO("IntPropertyProxy");
             return Cast<IntPropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<Int64PropertyProxy>");
         if (IsA<Int64PropertyProxy>()) {
+            //LOG_INFO("Int64PropertyProxy");
             return Cast<Int64PropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<FloatPropertyProxy>");
         if (IsA<FloatPropertyProxy>()) {
+            //LOG_INFO("FloatPropertyProxy");
             return Cast<FloatPropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<DoublePropertyProxy>");
         if (IsA<DoublePropertyProxy>()) {
+            //LOG_INFO("DoublePropertyProxy");
             return Cast<DoublePropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<BoolPropertyProxy>");
         if (IsA<BoolPropertyProxy>()) {
+            //LOG_INFO("BoolPropertyProxy");
             return Cast<BoolPropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<ObjectPropertyProxy>");
         if (IsA<ObjectPropertyProxy>()) {
+            //LOG_INFO("ObjectPropertyProxy");
             return Cast<ObjectPropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<ObjectPropertyBaseProxy>");
         if (IsA<ObjectPropertyBaseProxy>()) {
+            //LOG_INFO("ObjectPropertyBaseProxy");
             return Cast<ObjectPropertyBaseProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<ClassPropertyProxy>");
         if (IsA<ClassPropertyProxy>()) {
+            //LOG_INFO("ClassPropertyProxy");
             return Cast<ClassPropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<InterfacePropertyProxy>");
         if (IsA<InterfacePropertyProxy>()) {
+            //LOG_INFO("InterfacePropertyProxy");
             return Cast<InterfacePropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<WeakObjectPropertyProxy>");
         if (IsA<WeakObjectPropertyProxy>()) {
+            //LOG_INFO("WeakObjectPropertyProxy");
             return Cast<WeakObjectPropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<LazyObjectPropertyProxy>");
         if (IsA<LazyObjectPropertyProxy>()) {
+            //LOG_INFO("LazyObjectPropertyProxy");
             return Cast<LazyObjectPropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<AssetObjectPropertyProxy>");
         if (IsA<AssetObjectPropertyProxy>()) {
+            //LOG_INFO("AssetObjectPropertyProxy");
             return Cast<AssetObjectPropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<AssetClassPropertyProxy>");
         if (IsA<AssetClassPropertyProxy>()) {
+            //LOG_INFO("AssetClassPropertyProxy");
             return Cast<AssetClassPropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<NamePropertyProxy>");
         if (IsA<NamePropertyProxy>()) {
+            //LOG_INFO("NamePropertyProxy");
             return Cast<NamePropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<StructPropertyProxy>");
         if (IsA<StructPropertyProxy>()) {
+            //LOG_INFO("StructPropertyProxy");
             return Cast<StructPropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<StrPropertyProxy>");
         if (IsA<StrPropertyProxy>()) {
+            //LOG_INFO("StrPropertyProxy");
             return Cast<StrPropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<TextPropertyProxy>");
         if (IsA<TextPropertyProxy>()) {
+            //LOG_INFO("TextPropertyProxy");
             return Cast<TextPropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<ArrayPropertyProxy>");
         if (IsA<ArrayPropertyProxy>()) {
+            //LOG_INFO("ArrayPropertyProxy");
             return Cast<ArrayPropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<MapPropertyProxy>");
         if (IsA<MapPropertyProxy>()) {
+            //LOG_INFO("MapPropertyProxy");
             return Cast<MapPropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<DelegatePropertyProxy>");
         if (IsA<DelegatePropertyProxy>()) {
+            //LOG_INFO("DelegatePropertyProxy");
             return Cast<DelegatePropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<MulticastDelegatePropertyProxy>");
         if (IsA<MulticastDelegatePropertyProxy>()) {
+            //LOG_INFO("MulticastDelegatePropertyProxy");
             return Cast<MulticastDelegatePropertyProxy>().GetInfo();
         }
+        //LOG_INFO("IsA<EnumPropertyProxy>");
         if (IsA<EnumPropertyProxy>()) {
+            //LOG_INFO("EnumPropertyProxy");
             return Cast<EnumPropertyProxy>().GetInfo();
         }
     }

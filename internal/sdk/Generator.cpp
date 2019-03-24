@@ -9,7 +9,7 @@
 
 std::unordered_map<const UPackage*, const GeneratorPackage*> GeneratorPackage::PackageMap;
 
-std::unordered_map<std::string, int32_t> GeneratorAlignasClasses = {
+static std::unordered_map<std::string, int32_t> GeneratorAlignasClasses = {
     { "ScriptStruct CoreUObject.Plane", 16 },
     { "ScriptStruct CoreUObject.Quat", 16 },
     { "ScriptStruct CoreUObject.Transform", 16 },
@@ -110,13 +110,15 @@ bool ComparePropertyLess(const PropertyProxy& lhs, const PropertyProxy& rhs)
 void GeneratorPackage::GenerateEnum(const EnumProxy& Enum)
 {
     GeneratorEnum e;
-    e.Name = MakeUniqueCppName(Enum);
+    e.Name = MakeUniqueCppName(Enum.Get<UEnum>());
     if (e.Name.find("Default__") != std::string::npos ||
         e.Name.find("PLACEHOLDER-CLASS") != std::string::npos) {
         return;
     }
 
     e.FullName = Enum.GetFullName();
+
+    LOG_DBG_PRINT("Enum:          %-98s - instance: 0x%p\n", e.FullName.c_str(), Enum.GetAddress());
 
     std::unordered_map<std::string, int> conflicts;
     for (auto&& s : Enum.GetNames()) {
@@ -388,7 +390,7 @@ void GeneratorPackage::GenerateScriptStruct(const ScriptStructProxy& ScriptStruc
     if (it != std::end(GeneratorAlignasClasses)) {
         ss.NameCppFull += tfm::format(_XOR_("alignas(%d) "), it->second);
     }
-    ss.NameCppFull += MakeUniqueCppName(ScriptStruct);
+    ss.NameCppFull += MakeUniqueCppName(ScriptStruct.Get<UStruct>());
     ss.Size = ScriptStruct.GetPropertiesSize();
     ss.InheritedSize = 0;
 
@@ -396,7 +398,7 @@ void GeneratorPackage::GenerateScriptStruct(const ScriptStructProxy& ScriptStruc
     StructProxy SuperStruct = ScriptStruct.GetSuper();
     if (SuperStruct.IsValid() && SuperStruct.GetAddress() != ScriptStruct.GetAddress()) {
         ss.InheritedSize = Offset = SuperStruct.GetPropertiesSize();
-        ss.NameCppFull += _XORSTR_(" : public ") + MakeUniqueCppName(SuperStruct.Cast<ScriptStructProxy>());
+        ss.NameCppFull += _XORSTR_(" : public ") + MakeUniqueCppName(SuperStruct.Get<UStruct>());
     }
 
     std::vector<PropertyProxy> Props;
@@ -426,6 +428,7 @@ void GeneratorPackage::GenerateMemberPrerequisites(const PropertyProxy& First, s
     while (Prop.IsValid()) {
 
         const PropertyInfo PropInfo = Prop.GetInfo();
+
         if (PropInfo.Type == PropertyType::Primitive) {
 
             if (Prop.IsA<BytePropertyProxy>()) {
@@ -450,7 +453,6 @@ void GeneratorPackage::GenerateMemberPrerequisites(const PropertyProxy& First, s
         } else if (PropInfo.Type == PropertyType::Container) {
 
             std::vector<PropertyProxy> InnerProperties;
-
             if (Prop.IsA<ArrayPropertyProxy>()) {
                 InnerProperties.push_back(Prop.Cast<ArrayPropertyProxy>().GetInner());
             } else if (Prop.IsA<MapPropertyProxy>()) {
@@ -535,15 +537,15 @@ void GeneratorPackage::GeneratePrerequisites(const ObjectProxy& Obj, std::unorde
 
 void GeneratorPackage::Process(const ObjectsProxy& Objects, std::unordered_map<const UObject*, bool>& ProcessedObjects)
 {
-    for (int32_t i = 0; i < Objects.GetNum(); ++i) {
-        ObjectProxy Object = Objects.GetById(i);
+    for (ObjectProxy Object : Objects) {
         if (Object.IsValid()) {
-            if (PackageObject == Object.GetOutermost() && Object.GetClass()) {
+            const UPackage* Package = Object.GetOutermost();
+            if (PackageObject == Package /*&& Object.GetClass()*/) {
 
                 if (Object.IsA<EnumProxy>()) {
 
                     //LOG_INFO("Processing enum \"%s\"...\n", Object.GetFullName().c_str());
-                    GenerateEnum(EnumProxy(reinterpret_cast<const UEnum*>(PackageObject)));
+                    GenerateEnum(Object.Cast<EnumProxy>());
 
                 } else if (Object.IsA<ClassProxy>()) {
 
@@ -889,22 +891,32 @@ void GeneratorProcessPackages(const std::experimental::filesystem::path& path)
     std::experimental::filesystem::create_directories(SdkPath);
 
     std::vector<std::unique_ptr<GeneratorPackage>> Packages;
-    std::vector<const UPackage*> PackageObjects;
     std::unordered_map<const UObject*, bool> ProcessedObjects;
 
     ObjectsProxy Objects;
+    std::vector<const UPackage*> PackageObjects = from(Objects)
+        >> select([](auto&& o) { return o.GetOutermost(); })
+        >> where([](auto&& o) { return o != nullptr; })
+        >> distinct()
+        >> to_vector();
 
-    for (int32_t i = 0; i < Objects.GetNum(); ++i) {
-        ObjectProxy Object = Objects.GetById(i);
-        if (Object.IsValid()) {
-            PackageObjects.push_back(Object.GetOutermost());
-        }
-    }
-
-    //for (const UPackage* Package : PackageObjects) {
-    //    ObjectProxy Object = Package;
-    //    LOG_DBG_PRINT("Full name = %s\n", Object.GetFullName().c_str());
+    //for (int32_t i = 0; i < Objects.GetNum(); ++i) {
+    //    ObjectProxy Object = Objects.GetById(i);
+    //    if (Object.IsValid()) {
+    //        const UPackage* Outermost = Object.GetOutermost();
+    //        if (Outermost) {
+    //            PackageObjects.push_back(Outermost);
+    //        }
+    //    }
     //}
+    //LOG_INFO(_XOR_("MADEIT0"));
+    //for (const UPackage* PackageObj : PackageObjects) {
+    //    ObjectProxy Object = PackageObj;
+    //    LOG_DBG_PRINT("Package object %d = %s\n",
+    //                  Object.GetUniqueId(), Object.GetFullName().c_str());
+    //}
+    //LOG_INFO(_XOR_("MADEIT4"));
+    //LOG_DBG_PRINT("DONE\n");
 
     for (auto PackageObject : PackageObjects) {
         //GeneratorPackage Package(PackageObject);
@@ -915,6 +927,8 @@ void GeneratorProcessPackages(const std::experimental::filesystem::path& path)
             Packages.emplace_back(std::move(Package));
         }
     }
+
+    LOG_INFO(_XOR_("Donezo."));
 
     if (!Packages.empty()) {
         // std::sort doesn't work, so use a simple bubble sort
@@ -928,8 +942,6 @@ void GeneratorProcessPackages(const std::experimental::filesystem::path& path)
             }
         }
     }
-
-    LOG_INFO(_XOR_("Donezo."));
 
     GeneratorSaveSdkHeader(path, ProcessedObjects, Packages);
 }
