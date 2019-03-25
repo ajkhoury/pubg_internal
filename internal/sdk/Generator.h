@@ -13,8 +13,6 @@
 #include <bitset>
 
 
-void GeneratorProcessPackages(const std::experimental::filesystem::path& path);
-
 enum class FileContentType {
     Structs,
     Classes,
@@ -70,6 +68,11 @@ struct GeneratorMethod {
     bool IsStatic;
 };
 
+struct GeneratorPredefinedMember {
+    std::string Type;
+    std::string Name;
+};
+
 struct GeneratorPredefinedMethod {
     enum class Type {
         Default,
@@ -102,6 +105,130 @@ struct GeneratorClass : GeneratorScriptStruct {
     std::vector<GeneratorMethod> Methods;
 };
 
+typedef std::vector<std::tuple<size_t, const char*, const char*>> GeneratorPattern;
+
+class GeneratorPackage;
+
+class Generator {
+public:
+    // Constructor which sets generator options.
+    Generator(const std::experimental::filesystem::path& InPath,
+              bool InShouldUseStrings = false,
+              bool InShouldXorStrings = false,
+              bool InConvertStaticMethods = false,
+              bool InGenerateFunctionParametersFile = false)
+        : Path(InPath)
+        , bShouldUseStrings(InShouldUseStrings)
+        , bShouldXorStrings(InShouldXorStrings)
+        , bConvertStaticMethods(InConvertStaticMethods)
+        , bGenerateFunctionParametersFile(InGenerateFunctionParametersFile)
+    {
+    }
+
+    // Check if the generated classes should use strings to identify objects.
+    // If false the generated classes use the object index.
+    // Warning: The object index may change for non default classes.
+    bool ShouldUseStrings() const { return bShouldUseStrings; }
+
+    // Check if strings should be xor encoded.
+    bool ShouldXorStrings() const { return bShouldXorStrings; }
+
+    // Check if static methods should get converted to normal methods.
+    // Static methods require a CreateDefaultObject() method in the UObject class.
+    bool ShouldConvertStaticMethods() const { return bConvertStaticMethods; }
+
+    // Check if we should generate a function parameters file.
+    // Otherwise the parameters are declared inside the function body.
+    // If hooks with access to the parameters are need, this method should return true.
+    bool ShouldGenerateFunctionParametersFile() const { return bGenerateFunctionParametersFile; }
+
+    // Process the packages.
+    void ProcessPackages(const std::experimental::filesystem::path& path);
+
+    inline const std::experimental::filesystem::path& GetPath() const { return Path; }
+
+public:
+
+    // Public static fields.
+    static std::unordered_map<const UPackage*, const GeneratorPackage*> PackageMap;
+    static std::unordered_map<std::string, int32_t> AlignasClasses;
+
+    // Gets alignas size for the specific class.
+    static inline size_t GetClassAlignas(const std::string& name)
+    {
+        auto it = AlignasClasses.find(name);
+        if (it != std::end(AlignasClasses)) {
+            return it->second;
+        }
+        return 0;
+    }
+
+    // Gets the predefined members of the specific class.
+    static bool GetPredefinedClassMembers(const std::string& name,
+                                          std::vector<GeneratorPredefinedMember>& members)
+    {
+        auto it = PredefinedMembers.find(name);
+        if (it != std::end(PredefinedMembers)) {
+            std::copy(std::begin(it->second), std::end(it->second), std::back_inserter(members));
+            return true;
+        }
+        return false;
+    }
+
+    // Gets the static predefined members of the specific class.
+    static bool GetPredefinedClassStaticMembers(const std::string& name,
+                                                std::vector<GeneratorPredefinedMember>& members)
+    {
+        auto it = PredefinedStaticMembers.find(name);
+        if (it != std::end(PredefinedStaticMembers)) {
+            std::copy(std::begin(it->second), std::end(it->second), std::back_inserter(members));
+            return true;
+        }
+        return false;
+    }
+
+    // Gets the predefined methods of the specific class.
+    static bool GetPredefinedClassMethods(const std::string& name,
+                                          std::vector<GeneratorPredefinedMethod>& methods)
+    {
+        auto it = PredefinedMethods.find(name);
+        if (it != std::end(PredefinedMethods)) {
+            std::copy(std::begin(it->second), std::end(it->second), std::back_inserter(methods));
+            return true;
+        }
+        return false;
+    }
+
+    // Gets the patterns of virtual functions of the specific class.
+    // The generator loops the virtual functions of the class and adds a class method if the pattern matches.
+    static bool GetVirtualFunctionPatterns(const std::string& name, GeneratorPattern& patterns)
+    {
+        auto it = VirtualFunctionPatterns.find(name);
+        if (it != std::end(VirtualFunctionPatterns)) {
+            std::copy(std::begin(it->second), std::end(it->second), std::back_inserter(patterns));
+            return true;
+        }
+        return false;
+    }
+
+private:
+    void SaveSdkHeader(const std::experimental::filesystem::path& Path,
+                       const std::unordered_map<const UObject*, bool>& ProcessedObjects,
+                       const std::vector<std::unique_ptr<GeneratorPackage>>& Packages);
+
+    // Private fields.
+    std::experimental::filesystem::path Path;
+    bool bShouldUseStrings;
+    bool bShouldXorStrings;
+    bool bConvertStaticMethods;
+    bool bGenerateFunctionParametersFile;
+
+    // Private static fields.
+    static std::unordered_map<std::string, std::vector<GeneratorPredefinedMember>> PredefinedMembers;
+    static std::unordered_map<std::string, std::vector<GeneratorPredefinedMember>> PredefinedStaticMembers;
+    static std::unordered_map<std::string, std::vector<GeneratorPredefinedMethod>> PredefinedMethods;
+    static std::unordered_map<std::string, GeneratorPattern> VirtualFunctionPatterns;
+};
 
 class GeneratorPackage {
 
@@ -110,10 +237,9 @@ class GeneratorPackage {
     friend struct GeneratorPackageDependencyComparer;
 
 public:
-    static std::unordered_map<const UPackage*, const GeneratorPackage*> PackageMap;
-
-    GeneratorPackage(const UPackage* PackageObj)
-        : PackageObject(const_cast<UPackage*>(PackageObj))
+    GeneratorPackage(const Generator* InGenerator, const UPackage* PackageObj)
+        : Generator(InGenerator)
+        , PackageObject(const_cast<UPackage*>(PackageObj))
     {
     }
 
@@ -128,14 +254,13 @@ public:
     void Process(const ObjectsProxy& Objects, std::unordered_map<const UObject*, bool>& ProcessedObjects);
 
     // Saves the Package classes as C++ code.
-    bool Save(const std::experimental::filesystem::path& path) const;
-
+    bool Save(const std::experimental::filesystem::path& SdkPath) const;
 
 private:
     // Add object to the dependency objects list.
     inline bool AddDependency(const UPackage* Package) const
     {
-        if (Package != nullptr && Package != PackageObject) {
+        if (Package && Package != PackageObject) {
             DependencyObjects.insert(Package);
             return true;
         }
@@ -159,16 +284,20 @@ private:
 
 
     // Writes all structs into the appropriate file.
-    void SaveStructs(const std::experimental::filesystem::path& path) const;
+    void SaveStructs(const std::experimental::filesystem::path& SdkPath) const;
     // Writes all classes into the appropriate file.
-    void SaveClasses(const std::experimental::filesystem::path& path) const;
+    void SaveClasses(const std::experimental::filesystem::path& SdkPath) const;
     // Writes all functions into the appropriate file.
-    void SaveFunctions(const std::experimental::filesystem::path& path) const;
+    void SaveFunctions(const std::experimental::filesystem::path& SdkPath) const;
     // Writes all function parameters into the appropriate file.
-    void SaveFunctionParameters(const std::experimental::filesystem::path& path) const;
+    void SaveFunctionParameters(const std::experimental::filesystem::path& SdkPath) const;
 
+    // The parent generator instance.
+    const Generator* Generator;
 
+    // The package object describing this generator package.
     UPackage* PackageObject;
+    // Dependency objects of this package object.
     mutable std::unordered_set<const UPackage*> DependencyObjects;
 
     // Prints the c++ code of the constant.
@@ -186,7 +315,6 @@ private:
     // Print the C++ code of the class.
     void PrintClass(std::ostream& os, const GeneratorClass& Class) const;
     std::vector<GeneratorClass> Classes;
-
 };
 
 namespace std {
@@ -233,14 +361,11 @@ struct GeneratorPackageDependencyComparer {
         }
 
         for (const auto dep : rhs.DependencyObjects) {
-            const auto Package = GeneratorPackage::PackageMap[dep];
-            if (Package == nullptr) {
+            const auto Package = Generator::PackageMap[dep];
+            if (!Package)
                 continue; // Missing package, should not occur...
-            }
-
-            if (operator()(lhs, *Package)) {
+            if (operator()(lhs, *Package))
                 return true;
-            }
         }
 
         return false;

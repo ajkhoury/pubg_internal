@@ -103,7 +103,8 @@ TestThreadRoutine(
     //    }
     //}
 
-    GeneratorProcessPackages(_XOR_("C:\\Users\\Owner\\Desktop\\sdk"));
+    Generator Gen(_XOR_("C:\\Users\\Owner\\Desktop\\sdk"), true, true);
+    Gen.ProcessPackages(_XOR_("C:\\Users\\Owner\\Desktop\\sdk"));
 
     return STATUS_SUCCESS;
 }
