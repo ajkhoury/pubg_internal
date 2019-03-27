@@ -190,9 +190,8 @@
     <ClInclude Include="Sdk.h" />
     <ClInclude Include="sdk\cpplinq.h" />
     <ClInclude Include="sdk\CryptValue.h" />
-    <ClInclude Include="sdk\Engine.h" />
+    <ClInclude Include="sdk\UnrealTypes.h" />
     <ClInclude Include="sdk\Format.h" />
-    <ClInclude Include="sdk\FunctionFlags.h" />
     <ClInclude Include="sdk\Generator.h" />
     <ClInclude Include="sdk\Memory.h" />
     <ClInclude Include="sdk\Names.h" />

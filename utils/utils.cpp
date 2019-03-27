@@ -4,6 +4,87 @@
 
 namespace utils {
 
+WCHAR*
+UTLAPI
+WcsStr(
+    IN const WCHAR *String1,
+    IN const WCHAR *String2,
+    IN BOOLEAN CaseInsensitive
+)
+{
+    WCHAR *p1, *p2;
+    WCHAR *cp = const_cast<WCHAR *>(String1); // cast away const!
+
+    if (CaseInsensitive) {
+
+        while (*cp) {
+            for (p1 = cp, p2 = const_cast<WCHAR *>(String2); // cast away const!
+                 *p1 && *p2 && towlower(*p1) == towlower(*p2);
+                 ++p1, ++p2) {
+            }
+
+            if (!*p2) {
+                return cp;
+            }
+
+            ++cp;
+        }
+
+    } else {
+
+        while (*cp) {
+            p1 = cp;
+            p2 = const_cast<WCHAR *>(String2); // cast away const!
+
+            while (*p1 && *p2 && !(*p1 - *p2)) {
+                p1++, p2++;
+            }
+
+            if (!*p2) {
+                return (cp);
+            }
+
+            ++cp;
+        }
+    }
+
+    return NULL;
+}
+
+
+std::string
+UTLAPI
+wstring_to_string(
+    const std::wstring& wstr
+)
+{
+    int size = WideCharToMultiByte(CP_UTF8,
+                                   WC_ERR_INVALID_CHARS,
+                                   wstr.data(),
+                                   static_cast<int>(wstr.size()),
+                                   NULL,
+                                   0,
+                                   NULL,
+                                   NULL
+                                   );
+    if (size != 0) {
+
+        std::string str(size, 0);
+        if (WideCharToMultiByte(CP_UTF8,
+                                WC_ERR_INVALID_CHARS,
+                                wstr.data(),
+                                static_cast<int>(wstr.size()),
+                                const_cast<LPSTR>(str.data()),
+                                size,
+                                NULL,
+                                NULL) != 0) {
+            return str;
+        }
+    }
+
+    return std::string();
+}
+
 std::vector<std::string> SplitString(const std::string& Str, char Delimiter)
 {
     std::vector<std::string> Tokens;
@@ -153,6 +234,93 @@ FindPatternIDA(
     return NULL;
 }
 
+const UINT8*
+UTLAPI
+FindPatternIDA(
+    IN const void *SearchBase,
+    IN SIZE_T SearchSize,
+    IN const std::string& InPattern
+)
+{
+    const UINT8 *PatternStart = (const UINT8 *)InPattern.data();
+    const UINT8 *PatternEnd = PatternStart + InPattern.size();
+    const UINT8 *Pattern = PatternStart;
+    const UINT8 *RangeStart = (const UINT8 *)SearchBase;
+    const UINT8 *RangeEnd = RangeStart + SearchSize;
+    const UINT8 *FirstMatch = NULL;
+
+    for (const UINT8 *Current = RangeStart; Current < RangeEnd; ++Current) {
+
+        if (Pattern[0] == (UINT8)'\?') {
+
+            if (Pattern[1] == (UINT8)'\?') {
+
+                if (!FirstMatch)
+                    FirstMatch = Current;
+                Pattern += 3;
+                if (Pattern >= PatternEnd)
+                    return FirstMatch;
+
+            } else if ((*Current & 0x0F) == __GET_BYTE__(Pattern)) {
+
+                if (!FirstMatch)
+                    FirstMatch = Current;
+                Pattern += 3;
+                if (Pattern >= PatternEnd)
+                    return FirstMatch;
+
+            } else {
+
+                if (FirstMatch) {
+                    Current = FirstMatch;
+                    Pattern = PatternStart;
+                    FirstMatch = NULL;
+                }
+            }
+
+        } else if (Pattern[1] == (UINT8)'\?') {
+
+            if ((*Current & 0xF0) == __GET_BYTE__(Pattern)) {
+
+                if (!FirstMatch)
+                    FirstMatch = Current;
+                Pattern += 3;
+                if (Pattern >= PatternEnd)
+                    return FirstMatch;
+
+            } else {
+
+                if (FirstMatch) {
+                    Current = FirstMatch;
+                    Pattern = PatternStart;
+                    FirstMatch = NULL;
+                }
+            }
+
+        } else {
+
+            if (*Current == __GET_BYTE__(Pattern)) {
+
+                if (!FirstMatch)
+                    FirstMatch = Current;
+                Pattern += 3;
+                if (Pattern >= PatternEnd)
+                    return FirstMatch;
+
+            } else {
+
+                if (FirstMatch) {
+                    Current = FirstMatch;
+                    Pattern = PatternStart;
+                    FirstMatch = NULL;
+                }
+            }
+        }
+    }
+
+    return NULL;
+}
+
 int
 UTLAPI
 FindFunctionStartFromPtr(
@@ -225,53 +393,6 @@ FindFunctionStartFromPtr(
 
     *FoundAddress = (const UINT8 *)Found;
     return NOERROR;
-}
-
-WCHAR*
-UTLAPI
-WcsStr(
-    IN const WCHAR *String1,
-    IN const WCHAR *String2,
-    IN BOOLEAN CaseInsensitive
-)
-{
-    WCHAR *p1, *p2;
-    WCHAR *cp = const_cast<WCHAR *>(String1); // cast away const!
-
-    if (CaseInsensitive) {
-
-        while (*cp) {
-            for (p1 = cp, p2 = const_cast<WCHAR *>(String2); // cast away const!
-                 *p1 && *p2 && towlower(*p1) == towlower(*p2);
-                 ++p1, ++p2) {
-            }
-
-            if (!*p2) {
-                return cp;
-            }
-
-            ++cp;
-        }
-
-    } else {
-
-        while (*cp) {
-            p1 = cp;
-            p2 = const_cast<WCHAR *>(String2); // cast away const!
-
-            while (*p1 && *p2 && !(*p1 - *p2)) {
-                p1++, p2++;
-            }
-
-            if (!*p2) {
-                return (cp);
-            }
-
-            ++cp;
-        }
-    }
-
-    return NULL;
 }
 
 UINT32

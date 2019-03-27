@@ -488,6 +488,11 @@ WcsStr(
     IN BOOLEAN CaseInsensitive
     );
 
+std::string
+UTLAPI
+wstring_to_string(
+    const std::wstring& wstr
+    );
 
 std::vector<std::string>
 UTLAPI
@@ -541,6 +546,14 @@ FindPatternIDA(
     IN const void *SearchBase,
     IN SIZE_T SearchSize,
     IN const char *Pattern
+    );
+
+const UINT8*
+UTLAPI
+FindPatternIDA(
+    IN const void *SearchBase,
+    IN SIZE_T SearchSize,
+    IN const std::string& Pattern
     );
 
 /**
@@ -644,46 +657,46 @@ GetModuleSize(
 
 
 // Read bits.
-template <typename T> static T read_bits(const void *address);
+template <typename T> inline T read_bits(const void *address);
 
-template <> static unsigned __int64 read_bits(const void *address) {
-    return *(unsigned __int64 *)address;
+template<> inline unsigned __int64 read_bits(const void *address) {
+    return *static_cast<const unsigned __int64 *>(address);
 }
 
-template <> static unsigned long read_bits(const void *address) {
-    return *(unsigned long *)address;
+template<> inline unsigned long read_bits(const void *address) {
+    return *static_cast<const unsigned long *>(address);
 }
 
-template <> static unsigned int read_bits(const void *address) {
-    return *(unsigned int *)address;
+template<> inline unsigned int read_bits(const void *address) {
+    return *static_cast<const unsigned int *>(address);
 }
 
-template <> static unsigned short read_bits(const void *address) {
-    return *(unsigned short *)address;
+template<> inline unsigned short read_bits(const void *address) {
+    return *static_cast<const unsigned short *>(address);
 }
 
-template <> static unsigned char read_bits(const void *address) {
-    return *(unsigned char *)address;
+template<> inline unsigned char read_bits(const void *address) {
+    return *static_cast<const unsigned char *>(address);
 }
 
-template <> static __int64 read_bits(const void *address) {
-    return *(__int64 *)address;
+template<> inline __int64 read_bits(const void *address) {
+    return *static_cast<const __int64 *>(address);
 }
 
-template <> static long read_bits(const void *address) {
-    return *(long *)address;
+template<> inline long read_bits(const void *address) {
+    return *static_cast<const long *>(address);
 }
 
-template <> static int read_bits(const void *address) {
-    return *(int *)address;
+template<> inline int read_bits(const void *address) {
+    return *static_cast<const int *>(address);
 }
 
-template <> static short read_bits(const void *address) {
-    return *(short *)address;
+template<> inline short read_bits(const void *address) {
+    return *static_cast<const short *>(address);
 }
 
-template <> static char read_bits(const void *address) {
-    return *(char *)address;
+template<> inline char read_bits(const void *address) {
+    return *static_cast<const char *>(address);
 }
 
 constexpr unsigned __int64 read_bits(const void *address, int width) {
@@ -707,46 +720,46 @@ constexpr unsigned __int64 read_bytes(const void *address, int width) {
 }
 
 // Write bits.
-template <typename T> static void write_bits(void *address, T value);
+template<typename T> inline void write_bits(void *address, T value);
 
-template <> static void write_bits(void *address, unsigned __int64 value) {
-    *reinterpret_cast<unsigned __int64 *>(address) = value;
+template<> inline void write_bits(void *address, unsigned __int64 value) {
+    *static_cast<unsigned __int64 *>(address) = value;
 }
 
-template <> static void write_bits(void *address, unsigned long value) {
-    *reinterpret_cast<unsigned long *>(address) = value;
+template<> inline void write_bits(void *address, unsigned long value) {
+    *static_cast<unsigned long *>(address) = value;
 }
 
-template <> static void write_bits(void *address, unsigned int value) {
-    *reinterpret_cast<unsigned int *>(address) = value;
+template<> inline void write_bits(void *address, unsigned int value) {
+    *static_cast<unsigned int *>(address) = value;
 }
 
-template <> static void write_bits(void *address, unsigned short value) {
-    *reinterpret_cast<unsigned short *>(address) = value;
+template<> inline void write_bits(void *address, unsigned short value) {
+    *static_cast<unsigned short *>(address) = value;
 }
 
-template <> static void write_bits(void *address, unsigned char value) {
-    *reinterpret_cast<unsigned char *>(address) = value;
+template<> inline void write_bits(void *address, unsigned char value) {
+    *static_cast<unsigned char *>(address) = value;
 }
 
-template <> static void write_bits(void *address, __int64 value) {
-    *reinterpret_cast<__int64 *>(address) = value;
+template<> inline void write_bits(void *address, __int64 value) {
+    *static_cast<__int64 *>(address) = value;
 }
 
-template <> static void write_bits(void *address, long value) {
-    *reinterpret_cast<long *>(address) = value;
+template<> inline void write_bits(void *address, long value) {
+    *static_cast<long *>(address) = value;
 }
 
-template <> static void write_bits(void *address, int value) {
+template<> inline void write_bits(void *address, int value) {
     *reinterpret_cast<int *>(address) = value;
 }
 
-template <> static void write_bits(void *address, short value) {
-    *reinterpret_cast<short *>(address) = value;
+template<> inline void write_bits(void *address, short value) {
+    *static_cast<short *>(address) = value;
 }
 
-template <> static void write_bits(void *address, char value) {
-    *reinterpret_cast<char *>(address) = value;
+template<> inline void write_bits(void *address, char value) {
+    *static_cast<char *>(address) = value;
 }
 
 constexpr void write_bits(void *address, int width, unsigned __int64 value) {
@@ -769,8 +782,14 @@ constexpr void write_bytes(void *address, int width, unsigned __int64 value) {
     }
 }
 
-template <typename T> void write_value(void *buffer, T value) {
+template<typename T> inline void write_value(void *buffer, T value) {
     *reinterpret_cast<T *>(buffer) = value;
+}
+
+template<typename TFn> inline TFn GetVFunction(const void *instance, std::size_t index)
+{
+    const void** VTable = *reinterpret_cast<const void***>(const_cast<void*>(instance));
+    return reinterpret_cast<TFn>(VTable[index]);
 }
 
 } // utils

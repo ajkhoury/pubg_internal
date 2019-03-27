@@ -146,9 +146,6 @@
     <ClInclude Include="..\utils\xorstr.h">
       <Filter>utils</Filter>
     </ClInclude>
-    <ClInclude Include="sdk\Engine.h">
-      <Filter>internal\sdk</Filter>
-    </ClInclude>
     <ClInclude Include="sdk\Memory.h">
       <Filter>internal\sdk</Filter>
     </ClInclude>
@@ -188,9 +185,6 @@
     <ClInclude Include="sdk\tinyformat.h">
       <Filter>internal\sdk</Filter>
     </ClInclude>
-    <ClInclude Include="sdk\FunctionFlags.h">
-      <Filter>internal\sdk</Filter>
-    </ClInclude>
     <ClInclude Include="engine_lean.h">
       <Filter>internal</Filter>
     </ClInclude>
@@ -198,6 +192,9 @@
       <Filter>utils</Filter>
     </ClInclude>
     <ClInclude Include="sdk\OffsetDumper.h">
+      <Filter>internal\sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\UnrealTypes.h">
       <Filter>internal\sdk</Filter>
     </ClInclude>
   </ItemGroup>

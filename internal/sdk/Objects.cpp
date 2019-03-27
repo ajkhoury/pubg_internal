@@ -9,6 +9,7 @@
 #include <iterator>
 
 DEFINE_STATIC_CLASS(Object);
+DEFINE_STATIC_CLASS(Package);
 DEFINE_STATIC_CLASS(Field);
 DEFINE_STATIC_CLASS(Enum);
 DEFINE_STATIC_CLASS(Struct);
@@ -16,11 +17,7 @@ DEFINE_STATIC_CLASS(ScriptStruct);
 DEFINE_STATIC_CLASS(Function);
 DEFINE_STATIC_CLASS(Class);
 
-ObjectProxy ObjectIterator::operator*() const { return ObjectsProxy().GetById(Index); }
-ObjectProxy ObjectIterator::operator->() const { return ObjectsProxy().GetById(Index); }
-
 std::unordered_map<std::string, int32_t> ObjectsProxy::ObjectsCacheMap;
-
 
 #ifdef __cplusplus
 extern "C" {
@@ -152,94 +149,87 @@ UObject *ObjectsProxy::GetById(int32_t Index) const
 
 
 
-int32_t ObjectProxy::GetFlags() const
+int32_t UObject::GetFlags() const
 {
-    return static_cast<int32_t>(DecryptObjectFlagsAsm(Object->ObjectFlagsEncrypted));
+    return static_cast<int32_t>(DecryptObjectFlagsAsm(ObjectFlagsEncrypted));
 }
 
-uint32_t ObjectProxy::GetUniqueId() const
+uint32_t UObject::GetUniqueId() const
 {
-    return DecryptObjectIndexAsm(Object->InternalIndexEncrypted);
+    return DecryptObjectIndexAsm(InternalIndexEncrypted);
 }
 
-UClass *ObjectProxy::GetClass() const
+UClass* UObject::GetClass() const
 {
-    return (UClass *)DecryptObjectClassAsm(Object->ClassEncrypted);
+    return (UClass*)DecryptObjectClassAsm(ClassEncrypted);
 }
 
-UObject *ObjectProxy::GetOuter() const
+UObject* UObject::GetOuter() const
 {
-    return (UObject *)DecryptObjectOuterAsm(Object->OuterEncrypted);
+    return (UObject*)DecryptObjectOuterAsm(OuterEncrypted);
 }
 
-FName ObjectProxy::GetFName() const
+FName UObject::GetFName() const
 {
     int32_t NameIndex, NameNumber;
-    DecryptObjectFNameAsm(Object->NameIndexEncrypted,
-                          Object->NameNumberEncrypted,
-                          &NameIndex, &NameNumber);
+    DecryptObjectFNameAsm(NameIndexEncrypted, NameNumberEncrypted, &NameIndex, &NameNumber);
     return FName(NameIndex, NameNumber);
 }
 
-const UPackage* ObjectProxy::GetOutermost() const
+const UPackage* UObject::GetOutermost() const
 {
     UObject* Top = NULL;
-    for (UObject* Outer = GetOuter(); Outer; Outer = ObjectProxy(Outer).GetOuter()) {
+    for (UObject* Outer = GetOuter(); Outer; Outer = Outer->GetOuter()) {
         Top = Outer;
     }
     return static_cast<const UPackage*>(Top);
 }
 
-std::string ObjectProxy::GetName() const
+std::string UObject::GetName() const
 {
-    std::string NameString;
+    FName Name = GetFName();
+    std::string NameString = NamesProxy().GetById(Name.Index);
+    if (Name.Number > 0) {
+        NameString += '_' + std::to_string(Name.Number);
+    }
 
-    if (IsValid()) {
-
-        FName Name = GetFName();
-        NameString = NamesProxy().GetById(Name.Index);
-        if (Name.Number > 0) {
-            NameString += '_' + std::to_string(Name.Number);
-        }
-
-        auto pos = NameString.rfind('/');
-        if (pos != std::string::npos) {
-            NameString = NameString.substr(pos + 1);
-        }
+    size_t pos = NameString.rfind('/');
+    if (pos != std::string::npos) {
+        NameString = NameString.substr(pos + 1);
     }
 
     return NameString;
 }
 
-std::string ObjectProxy::GetFullName() const
+std::string UObject::GetFullName() const
 {
     std::string NameString;
-    if (IsValid() && GetClass()) {
+    const UClass* Class = GetClass();
+    if (Class) {
         std::string Temp;
         UObject* Outer = GetOuter();
         while(Outer) {
-            ObjectProxy OuterProxy = Outer;
-            Temp = OuterProxy.GetName() + "." + Temp;
-            Outer = OuterProxy.GetOuter();
+            Temp = Outer->GetName() + '.' + Temp;
+            Outer = Outer->GetOuter();
         }
-        ClassProxy ObjectClass(GetClass());
-        NameString = ObjectClass.GetName();
-        NameString += " ";
+        NameString = Class->GetName();
+        NameString += ' ';
         NameString += Temp;
         NameString += GetName();
     }
     return NameString;
 }
 
-std::string ObjectProxy::GetNameCPP() const
+std::string UObject::GetNameCPP() const
 {
     std::string NameString;
 
-    if (IsA<ClassProxy>()) {
+    if (IsA<UClass>()) {
 
-        ClassProxy Class = Cast<ClassProxy>();
-        while (Class.IsValid()) {
-            const std::string ClassName = Class.GetName();
+        const UClass* Class = static_cast<const UClass*>(this);
+        while (Class) {
+
+            const std::string ClassName = Class->GetName();
             if (ClassName == "Actor") {
                 NameString += "A";
                 break;
@@ -248,7 +238,8 @@ std::string ObjectProxy::GetNameCPP() const
                 NameString += "U";
                 break;
             }
-            Class = ObjectProxy(Class.GetSuper()).Cast<ClassProxy>();
+
+            Class = static_cast<const UClass*>(Class->GetSuper());
         }
 
     } else {
@@ -259,7 +250,40 @@ std::string ObjectProxy::GetNameCPP() const
     return NameString;
 }
 
-std::string StringifyFlags(const FunctionFlags Flags)
+bool UObject::IsA(const UClass* CmpClass) const
+{
+    UClass* SuperClass = GetClass();
+    while (SuperClass != nullptr) {
+        if (SuperClass == CmpClass) {
+            return true;
+        }
+        SuperClass = static_cast<UClass*>(SuperClass->GetSuper());
+    }
+    return false;
+}
+
+std::vector<std::string> UEnum::GetNames() const
+{
+    NamesProxy GlobalNames;
+    std::vector<std::string> StringArray;
+    const TArray<TPair<FName, int64_t>>& NamesArray = this->Names;
+
+    //LOG_INFO("MADEIT1 - NamesArray.Num = %d", NamesArray.Num());
+
+    for (auto Name : NamesArray) {
+        int32_t Index = Name.Key.GetIndex();
+        //LOG_INFO("MADEIT2 - NamesArray[%d].Key.GetIndex() = %d", i, Index);
+        StringArray.push_back(GlobalNames.GetById(Index));
+    }
+
+    //LOG_INFO("MADEIT3");
+
+    return StringArray;
+}
+
+
+
+std::string StringifyFunctionFlags(const uint32_t Flags)
 {
     std::vector<const char*> buffer;
 

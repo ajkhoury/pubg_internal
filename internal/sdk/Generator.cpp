@@ -2,11 +2,12 @@
 #include "Objects.h"
 #include "Properties.h"
 #include "Format.h"
-#include "FunctionFlags.h"
 
 #include <native/log.h>
 #include <utils/xorstr.h>
 #include <utils/utils.h>
+
+using namespace cpplinq;
 
 // Public static fields of Generator.
 std::unordered_map<const UPackage*, const GeneratorPackage*> Generator::PackageMap;
@@ -18,11 +19,6 @@ std::unordered_map<std::string, int32_t> Generator::AlignasClasses = {
     { "ScriptStruct Engine.RootMotionSourceGroup", 8 }
 };
 
-// Private static fields of Generator.
-std::unordered_map<std::string, std::vector<GeneratorPredefinedMember>> Generator::PredefinedMembers;
-std::unordered_map<std::string, std::vector<GeneratorPredefinedMember>> Generator::PredefinedStaticMembers;
-std::unordered_map<std::string, std::vector<GeneratorPredefinedMethod>> Generator::PredefinedMethods;
-std::unordered_map<std::string, GeneratorPattern> Generator::VirtualFunctionPatterns;
 
 void PrintFileHeader(std::ostream& os, const std::vector<std::string>& includes, const bool isHeaderFile)
 {
@@ -62,41 +58,41 @@ void PrintSectionHeader(std::ostream& os, const char* name)
         << _XORSTR_("//---------------------------------------------------------------------------\n\n");
 }
 
-std::string GenerateFileName(const FileContentType type, const UPackage* PackageObject)
+std::string GenerateFileName(const FileContentType Type, const UPackage* PackageObject)
 {
-    const char* name;
-    switch (type) {
+    const char* Name;
+    switch (Type) {
     case FileContentType::Structs:
-        name = _XOR_("%s_%s_structs.h");
+        Name = _XOR_("%s_%s_structs.h");
         break;
     case FileContentType::Classes:
-        name = _XOR_("%s_%s_classes.h");
+        Name = _XOR_("%s_%s_classes.h");
         break;
     case FileContentType::Functions:
-        name = _XOR_("%s_%s_functions.cpp");
+        Name = _XOR_("%s_%s_functions.cpp");
         break;
     case FileContentType::FunctionParameters:
-        name = _XOR_("%s_%s_parameters.h");
+        Name = _XOR_("%s_%s_parameters.h");
         break;
     default:
         assert(false);
     }
 
-    return tfm::format(name, _XOR_("PUBG"), ObjectProxy(PackageObject).GetName());
+    return tfm::format(Name, _XOR_("PUBG"), PackageObject->GetName());
 }
 
-bool GeneratorParameter::MakeType(PropertyFlags flags, GeneratorParameter::Type& type)
+bool GeneratorParameter::MakeType(const uint64_t flags, GeneratorParameter::Type& type)
 {
-    if (flags & PropertyFlags::ReturnParm) {
+    if (flags & CPF_ReturnParm) {
         type = Type::Return;
-    } else if (flags & PropertyFlags::OutParm) {
+    } else if (flags & CPF_OutParm) {
         //if it is a const parameter make it a default parameter
-        if (flags & PropertyFlags::ConstParm) {
+        if (flags & CPF_ConstParm) {
             type = Type::Default;
         } else {
             type = Type::Out;
         }
-    } else if (flags & PropertyFlags::Parm) {
+    } else if (flags & CPF_Parm) {
         type = Type::Default;
     } else {
         return false;
@@ -104,30 +100,34 @@ bool GeneratorParameter::MakeType(PropertyFlags flags, GeneratorParameter::Type&
     return true;
 }
 
-bool ComparePropertyLess(const PropertyProxy& lhs, const PropertyProxy& rhs)
+bool ComparePropertyLess(const UProperty* lhs, const UProperty* rhs)
 {
-    if (lhs.GetOffset() == rhs.GetOffset() &&
-        lhs.IsA<BoolPropertyProxy>() &&
-        rhs.IsA<BoolPropertyProxy>()) {
-        return lhs.Cast<BoolPropertyProxy>() < rhs.Cast<BoolPropertyProxy>();
+    if (!lhs || !rhs) {
+        return lhs == rhs;
     }
-    return lhs.GetOffset() < rhs.GetOffset();
+
+    if (lhs->GetOffset() == rhs->GetOffset() &&
+        lhs->IsA<UBoolProperty>() && rhs->IsA<UBoolProperty>()) {
+        return lhs->Cast<UBoolProperty>() < rhs->Cast<UBoolProperty>();
+    }
+
+    return lhs->GetOffset() < rhs->GetOffset();
 }
 
-void GeneratorPackage::GenerateEnum(const EnumProxy& Enum)
+void GeneratorPackage::GenerateEnum(const UEnum* Enum)
 {
     GeneratorEnum e;
-    e.Name = MakeUniqueCppName(Enum.Get<UEnum>());
+    e.Name = MakeUniqueCppName(Enum);
     if (e.Name.find(_XOR_("Default__")) != std::string::npos ||
         e.Name.find(_XOR_("PLACEHOLDER-CLASS")) != std::string::npos) {
         return;
     }
-    e.FullName = Enum.GetFullName();
+    e.FullName = Enum->GetFullName();
 
-    LOG_DBG_PRINT("Enum:          %-98s - instance: 0x%p\n", e.FullName.c_str(), Enum.GetAddress());
+    LOG_DBG_PRINT("Enum:          %-98s - instance: 0x%p\n", e.FullName.c_str(), Enum);
 
     std::unordered_map<std::string, int> conflicts;
-    for (auto&& s : Enum.GetNames()) {
+    for (auto&& s : Enum->GetNames()) {
         const auto clean = MakeValidName(std::move(s));
         const auto it = conflicts.find(clean);
         if (it == std::end(conflicts)) {
@@ -142,54 +142,52 @@ void GeneratorPackage::GenerateEnum(const EnumProxy& Enum)
     Enums.emplace_back(std::move(e));
 }
 
-void GeneratorPackage::GenerateMethods(const ClassProxy& ClassObj, std::vector<GeneratorMethod>& methods) const
+void GeneratorPackage::GenerateMethods(const UClass* ClassObj, std::vector<GeneratorMethod>& methods) const
 {
     //some classes (AnimBlueprintGenerated...) have multiple Members with the same name, so filter them out
     std::unordered_set<std::string> UniqueMethods;
 
-    FieldProxy ClassChildren = ClassObj.GetChildren();
-    PropertyProxy Prop = ClassChildren.Cast<PropertyProxy>();
-    while (Prop.IsValid()) {
+    UProperty* Prop = static_cast<UProperty*>(ClassObj->GetChildren());
+    while (Prop) {
 
-        if (Prop.IsA<FunctionProxy>()) {
-            FunctionProxy Function = Prop.Cast<FunctionProxy>();
+        if (Prop->IsA<UFunction>()) {
+            UFunction* Function = Prop->Cast<UFunction>();
 
             GeneratorMethod m;
-            m.Index = Function.GetUniqueId();
-            m.FullName = Function.GetFullName();
-            m.Name = MakeValidName(Function.GetName());
+            m.Index = Function->GetUniqueId();
+            m.FullName = Function->GetFullName();
+            m.Name = MakeValidName(Function->GetName());
 
             if (UniqueMethods.find(m.FullName) != std::end(UniqueMethods)) {
                 continue;
             }
             UniqueMethods.insert(m.FullName);
 
-            m.IsNative = Function.GetFunctionFlags() & FunctionFlags::Native;
-            m.IsStatic = Function.GetFunctionFlags() & FunctionFlags::Static;
-            m.FlagsString = StringifyFlags(Function.GetFunctionFlags());
+            m.IsNative = Function->GetFunctionFlags() & FunctionFlags::Native;
+            m.IsStatic = Function->GetFunctionFlags() & FunctionFlags::Static;
+            m.FlagsString = StringifyFunctionFlags(Function->GetFunctionFlags());
 
-            std::vector<std::pair<PropertyProxy, GeneratorParameter>> Parameters;
+            std::vector<std::pair<UProperty*, GeneratorParameter>> Parameters;
 
             std::unordered_map<std::string, size_t> Unique;
-            FieldProxy FunctionChildren = Function.GetChildren();
-            PropertyProxy Param = FunctionChildren.Cast<PropertyProxy>();
-            while (Param.IsValid()) {
-                if (Param.GetElementSize() == 0) {
+            UProperty* Param = static_cast<UProperty*>(Function->GetChildren());
+            while (Param) {
+                if (Param->GetElementSize() == 0) {
                     continue;
                 }
 
-                const PropertyInfo ParamInfo = Param.GetInfo();
-                if (ParamInfo.Type != PropertyType::Unknown) {
+                const UProperty::Info ParamInfo = Param->GetInfo();
+                if (ParamInfo.Type != UProperty::PropertyType::Unknown) {
 
                     GeneratorParameter p;
 
-                    if (!GeneratorParameter::MakeType(Param.GetPropertyFlags(), p.ParamType)) {
+                    if (!GeneratorParameter::MakeType(Param->GetPropertyFlags(), p.ParamType)) {
                         // child isn't a parameter
                         continue;
                     }
 
                     p.PassByReference = false;
-                    p.Name = MakeValidName(Param.GetName());
+                    p.Name = MakeValidName(Param->GetName());
 
                     const auto it = Unique.find(p.Name);
                     if (it == std::end(Unique)) {
@@ -199,15 +197,15 @@ void GeneratorPackage::GenerateMethods(const ClassProxy& ClassObj, std::vector<G
                         p.Name += tfm::format("%02d", it->second);
                     }
 
-                    p.FlagsString = StringifyFlags(Param.GetPropertyFlags());
+                    p.FlagsString = StringifyPropertyFlags(Param->GetPropertyFlags());
 
                     p.CppType = ParamInfo.CppType;
-                    if (Param.IsA<BoolPropertyProxy>()) {
+                    if (Param->IsA<UBoolProperty>()) {
                         p.CppType = _XORSTR_("bool");
                     }
                     switch (p.ParamType) {
                     case GeneratorParameter::Type::Default:
-                        if (Prop.GetArrayDim() > 1) {
+                        if (Prop->GetArrayDim() > 1) {
                             p.CppType = p.CppType + '*';
                         } else if (ParamInfo.CanBeReference) {
                             p.PassByReference = true;
@@ -218,7 +216,7 @@ void GeneratorPackage::GenerateMethods(const ClassProxy& ClassObj, std::vector<G
                     Parameters.emplace_back(std::make_pair(Prop, std::move(p)));
                 }
 
-                Param = FieldProxy(Param.GetNext()).Cast<PropertyProxy>();
+                Param = static_cast<UProperty*>(Param->GetNext());
             }
 
             std::sort(std::begin(Parameters), std::end(Parameters),
@@ -231,9 +229,8 @@ void GeneratorPackage::GenerateMethods(const ClassProxy& ClassObj, std::vector<G
             methods.emplace_back(std::move(m));
         }
 
-        Prop = FieldProxy(Prop.GetNext()).Cast<PropertyProxy>();
+        Prop = static_cast<UProperty*>(Prop->GetNext());
     }
-
 }
 
 GeneratorMember CreatePadding(size_t id, int32_t offset, int32_t size, std::string reason)
@@ -257,27 +254,26 @@ GeneratorMember CreateBitfieldPadding(size_t id, int32_t offset, std::string typ
     return m;
 }
 
-void GeneratorPackage::GenerateMembers(const StructProxy& Struct, int32_t Offset, const std::vector<PropertyProxy>& Props, std::vector<GeneratorMember>& Members) const
+void GeneratorPackage::GenerateMembers(const UStruct* Struct, int32_t Offset, const std::vector<UProperty*>& Props, std::vector<GeneratorMember>& Members) const
 {
     std::unordered_map<std::string, size_t> UniqueMemberNames;
     size_t UnknownDataCounter = 0;
-    BoolPropertyProxy PreviousBitfieldProperty(nullptr);
+    UBoolProperty* PreviousBitfieldProperty = nullptr;
 
     for (auto&& Prop : Props) {
-        if (Offset < Prop.GetOffset()) {
-            PreviousBitfieldProperty = BoolPropertyProxy(nullptr);
-
-            const auto size = Prop.GetOffset() - Offset;
+        if (Offset < Prop->GetOffset()) {
+            PreviousBitfieldProperty = nullptr;
+            const int32_t size = Prop->GetOffset() - Offset;
             Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, size, _XORSTR_("MISSED OFFSET")));
         }
 
-        const PropertyInfo PropInfo = Prop.GetInfo();
-        if (PropInfo.Type != PropertyType::Unknown) {
+        const UProperty::Info PropInfo = Prop->GetInfo();
+        if (PropInfo.Type != UProperty::PropertyType::Unknown) {
             GeneratorMember sp;
-            sp.Offset = Prop.GetOffset();
+            sp.Offset = Prop->GetOffset();
             sp.Size = PropInfo.Size;
             sp.Type = PropInfo.CppType;
-            sp.Name = MakeValidName(Prop.GetName());
+            sp.Name = MakeValidName(Prop->GetName());
 
             const auto it = UniqueMemberNames.find(sp.Name);
             if (it == std::end(UniqueMemberNames)) {
@@ -287,16 +283,16 @@ void GeneratorPackage::GenerateMembers(const StructProxy& Struct, int32_t Offset
                 sp.Name += tfm::format("%02d", it->second);
             }
 
-            if (Prop.GetArrayDim() > 1) {
-                sp.Name += tfm::format("[0x%X]", Prop.GetArrayDim());
+            if (Prop->GetArrayDim() > 1) {
+                sp.Name += tfm::format("[0x%X]", Prop->GetArrayDim());
             }
 
-            if (Prop.IsA<BoolPropertyProxy>() && Prop.Cast<BoolPropertyProxy>().IsBitfield()) {
-                BoolPropertyProxy BoolProp = Prop.Cast<BoolPropertyProxy>();
-                const auto MissingBits = BoolProp.GetMissingBitsCount(PreviousBitfieldProperty);
+            if (Prop->IsA<UBoolProperty>() && static_cast<UBoolProperty*>(Prop)->IsBitfield()) {
+                UBoolProperty* BoolProp = static_cast<UBoolProperty*>(Prop);
+                const auto MissingBits = BoolProp->GetMissingBitsCount(PreviousBitfieldProperty);
                 if (MissingBits[1] != -1) {
                     if (MissingBits[0] > 0) {
-                        Members.emplace_back(CreateBitfieldPadding(UnknownDataCounter++, PreviousBitfieldProperty.GetOffset(), PropInfo.CppType, MissingBits[0]));
+                        Members.emplace_back(CreateBitfieldPadding(UnknownDataCounter++, PreviousBitfieldProperty->GetOffset(), PropInfo.CppType, MissingBits[0]));
                     }
                     if (MissingBits[1] > 0) {
                         Members.emplace_back(CreateBitfieldPadding(UnknownDataCounter++, sp.Offset, PropInfo.CppType, MissingBits[1]));
@@ -306,62 +302,69 @@ void GeneratorPackage::GenerateMembers(const StructProxy& Struct, int32_t Offset
                 }
 
                 PreviousBitfieldProperty = BoolProp;
-
                 sp.Name += _XORSTR_(" : 1");
+
             } else {
-                PreviousBitfieldProperty = BoolPropertyProxy(nullptr);
+
+                PreviousBitfieldProperty = nullptr;
             }
 
-            sp.Flags = static_cast<uint64_t>(Prop.GetPropertyFlags());
-            sp.FlagsString = StringifyFlags(Prop.GetPropertyFlags());
+            sp.Flags = Prop->GetPropertyFlags();
+            sp.FlagsString = StringifyPropertyFlags(sp.Flags);
 
             Members.emplace_back(std::move(sp));
 
-            const auto sizeMismatch = static_cast<int>(Prop.GetElementSize() * Prop.GetArrayDim()) - static_cast<int>(PropInfo.Size * Prop.GetArrayDim());
+            const int32_t sizeMismatch = (Prop->GetElementSize() * Prop->GetArrayDim()) - (PropInfo.Size * Prop->GetArrayDim());
             if (sizeMismatch > 0) {
                 Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, sizeMismatch, _XORSTR_("FIX WRONG TYPE SIZE OF PREVIOUS PROPERTY")));
             }
+
         } else {
-            const int32_t size = Prop.GetElementSize() * Prop.GetArrayDim();
-            Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, size, _XORSTR_("UNKNOWN PROPERTY: ") + Prop.GetFullName()));
+
+            const int32_t size = Prop->GetElementSize() * Prop->GetArrayDim();
+            Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, size, _XORSTR_("UNKNOWN PROPERTY: ") + Prop->GetFullName()));
         }
 
-        Offset = Prop.GetOffset() + Prop.GetElementSize() * Prop.GetArrayDim();
+        Offset = Prop->GetOffset() + Prop->GetElementSize() * Prop->GetArrayDim();
     }
 
-    if (Offset < Struct.GetPropertiesSize()) {
-        const int32_t size = Struct.GetPropertiesSize() - Offset;
+    if (Offset < Struct->GetPropertiesSize()) {
+        const int32_t size = Struct->GetPropertiesSize() - Offset;
         Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, size, _XORSTR_("MISSED OFFSET")));
     }
 }
 
-void GeneratorPackage::GenerateClass(const ClassProxy& ClassObj)
+void GeneratorPackage::GenerateClass(const UClass* ClassObj)
 {
+    if (!ClassObj)
+        return;
+
     GeneratorClass c;
-    c.Name = ClassObj.GetName();
-    c.FullName = ClassObj.GetFullName();
+    c.Name = ClassObj->GetName();
+    c.FullName = ClassObj->GetFullName();
 
-    LOG_DBG_PRINT("Class:          %-98s - instance: 0x%p\n", c.FullName.c_str(), ClassObj.GetAddress());
+    LOG_DBG_PRINT("Class:          %-98s - instance: 0x%p\n", c.FullName.c_str(), ClassObj);
 
-    c.NameCpp = MakeValidName(ClassObj.GetNameCPP());
+    c.NameCpp = MakeValidName(ClassObj->GetNameCPP());
     c.NameCppFull = _XORSTR_("class ") + c.NameCpp;
 
-    c.Size = ClassObj.GetPropertiesSize();
+    c.Size = ClassObj->GetPropertiesSize();
     c.InheritedSize = 0;
 
     int32_t offset = 0;
 
-    StructProxy SuperStruct = ClassObj.GetSuper();
-    if (SuperStruct.IsValid() && SuperStruct != ClassObj) {
-        c.InheritedSize = offset = SuperStruct.GetPropertiesSize();
-        c.NameCppFull += _XORSTR_(" : public ") + MakeValidName(SuperStruct.GetNameCPP());
+    UStruct* SuperStruct = ClassObj->GetSuper();
+    if (SuperStruct && SuperStruct != ClassObj) {
+        c.InheritedSize = offset = SuperStruct->GetPropertiesSize();
+        c.NameCppFull += _XORSTR_(" : public ") + MakeValidName(SuperStruct->GetNameCPP());
     }
 
     std::vector<GeneratorPredefinedMember> PredefinedStaticMembers;
     if (Generator->GetPredefinedClassStaticMembers(c.FullName, PredefinedStaticMembers)) {
         for (auto&& Member : PredefinedStaticMembers) {
             GeneratorMember m;
-            m.Offset = m.Size = 0;
+            m.Offset = (uint32_t)-1;
+            m.Size = 0;
             m.Name = Member.Name;
             m.Type = _XORSTR_("static ") + Member.Type;
             c.Members.push_back(std::move(m));
@@ -369,12 +372,13 @@ void GeneratorPackage::GenerateClass(const ClassProxy& ClassObj)
     }
 
     std::vector<GeneratorPredefinedMember> PredefinedMembers;
-    if (Generator->GetPredefinedClassMembers(c.FullName, PredefinedMembers)) {
+    c.bMembersPredefined = Generator->GetPredefinedClassMembers(c.FullName, PredefinedMembers, true);
+    if (c.bMembersPredefined) {
 
         for (auto&& Member : PredefinedMembers) {
             GeneratorMember m;
-            m.Offset = 0;
-            m.Size = 0;
+            m.Offset = Member.Offset;
+            m.Size = Member.Size;
             m.Name = Member.Name;
             m.Type = Member.Type;
             m.Comment = _XORSTR_("NOT AUTO-GENERATED PROPERTY");
@@ -383,19 +387,18 @@ void GeneratorPackage::GenerateClass(const ClassProxy& ClassObj)
 
     } else {
     
-        std::vector<PropertyProxy> Props;
-        FieldProxy ClassChildren = ClassObj.GetChildren();
-        PropertyProxy Prop = ClassChildren.Cast<PropertyProxy>();
-        while (Prop.IsValid()) {
-            if (Prop.GetElementSize() > 0 &&
-                !Prop.IsA<ScriptStructProxy>() &&
-                !Prop.IsA<FunctionProxy>() &&
-                !Prop.IsA<EnumProxy>() &&
-                (!SuperStruct.IsValid() ||
-                (SuperStruct != ClassObj && Prop.GetOffset() >= SuperStruct.GetPropertiesSize()))) {
+        std::vector<UProperty*> Props;
+        UProperty* Prop = static_cast<UProperty*>(ClassObj->GetChildren());
+        while (Prop) {
+            if (Prop->GetElementSize() > 0 &&
+                !Prop->IsA<UScriptStruct>() &&
+                !Prop->IsA<UFunction>() &&
+                !Prop->IsA<UEnum>() &&
+                (!SuperStruct ||
+                 (SuperStruct != ClassObj && Prop->GetOffset() >= SuperStruct->GetPropertiesSize()))) {
                 Props.push_back(Prop);
             }
-            Prop = FieldProxy(Prop.GetNext()).Cast<PropertyProxy>();
+            Prop = static_cast<UProperty*>(Prop->GetNext());
         }
         std::sort(std::begin(Props), std::end(Props), ComparePropertyLess);
 
@@ -409,18 +412,37 @@ void GeneratorPackage::GenerateClass(const ClassProxy& ClassObj)
     // Generate predefined StaticClass routine.
     if (Generator->ShouldUseStrings()) {
 
-        c.PredefinedMethods.push_back(GeneratorPredefinedMethod::Inline(
-            tfm::format(_XOR_("    static UClass* StaticClass()\n    {\n"
-                              "        static auto ptr = UObject::FindClass(%s);\n"
-                              "        return ptr;\n    }"),
-                        Generator->ShouldXorStrings() ? tfm::format("_XOR_(\"%s\")", c.FullName) : tfm::format("\"%s\"", c.FullName))));
+        c.PredefinedMethods.push_back(
+            GeneratorPredefinedMethod::Default(
+                tfm::format(_XOR_("static UClass* %sClass;\n    static UClass* StaticClass()"), c.NameCpp),
+                tfm::format(_XOR_(
+                "UClass* %s::%sClass = nullptr;\n"
+                "static UClass* %s::StaticClass()\n"
+                "{\n"
+                "    if (!%sClass)\n"
+                "        %sClass = UObject::FindClass(%s);\n"
+                "    return %sClass;\n"
+                "}"), c.NameCpp, c.NameCpp, c.NameCpp, c.NameCpp, c.NameCpp,
+                      Generator->ShouldXorStrings() ? tfm::format("_XOR_(\"%s\")", c.FullName) : tfm::format("\"%s\"", c.FullName),
+                      c.NameCpp)
+            )
+        );
+
     } else {
 
-        c.PredefinedMethods.push_back(GeneratorPredefinedMethod::Inline(
-            tfm::format(_XOR_("    static UClass* StaticClass()\n    {\n"
-                              "        static auto ptr = UObject::GetObjectCasted<UClass>(%d);\n"
-                              "        return ptr;\n    }"),
-                        ClassObj.GetUniqueId())));
+        c.PredefinedMethods.push_back(
+            GeneratorPredefinedMethod::Default(
+                tfm::format(_XOR_("static UClass* %sClass;\n    static UClass* StaticClass()"), c.NameCpp),
+                tfm::format(_XOR_(
+                    "UClass* %s::%sClass = nullptr;\n"
+                    "static UClass* %s::StaticClass()\n"
+                    "{\n"
+                    "    if (!%sClass)\n"
+                    "        %sClass = UObject::GetObjectCasted<UClass>(%d);\n"
+                    "    return %sClass;\n"
+                    "}"), c.NameCpp, c.NameCpp, c.NameCpp, c.NameCpp, c.NameCpp, ClassObj->GetUniqueId(), c.NameCpp)
+            )
+        );
     }
 
     // Skip BlueprintGeneratedClass types methods since they seem to be neverending.
@@ -435,30 +457,54 @@ void GeneratorPackage::GenerateClass(const ClassProxy& ClassObj)
     }
 
     // Search virtual functions.
-    GeneratorPattern Patterns;
+    std::vector<GeneratorPattern> Patterns;
     if (Generator->GetVirtualFunctionPatterns(c.FullName, Patterns)) {
 
         // Get the vtable address.
-        void** const VTable = *reinterpret_cast<void***>(ClassObj.GetAddress());
+        void** const VTable = *reinterpret_cast<void** const*>(ClassObj);
 
-        // Calculate the VTable method count.
+        uintptr_t ImageBase = reinterpret_cast<uintptr_t>(utils::GetModuleHandleWIDE(NULL));
+        size_t ImageSize = utils::GetModuleSize((HMODULE)ImageBase);
+
+        // Roughly calculate the VTable method count.
         size_t MethodCount = 0;
         while (1) {
-            MEMORY_BASIC_INFORMATION mbi;
-            SIZE_T res = VirtualQuery(VTable[MethodCount], &mbi, sizeof(mbi));
-            if ((res == 0) ||
-                (mbi.Protect != PAGE_EXECUTE_READWRITE && mbi.Protect != PAGE_EXECUTE_READ)) {
+            uintptr_t VTableEntry = reinterpret_cast<uintptr_t>(VTable[MethodCount]);
+            if (VTableEntry < ImageBase || VTableEntry >= (ImageBase + ImageSize))
                 break;
-            }
             ++MethodCount;
         }
 
-        // Search for the specified pattern in each virtual function.
+        LOG_INFO(_XOR_("%s VTable method count: %d"), c.FullName.c_str(), MethodCount);
+
+        // Search for each pattern in each virtual function.
         for (auto&& Pattern : Patterns) {
             for (size_t i = 0; i < MethodCount; ++i) {
-                if (VTable[i] &&
-                    utils::FindPatternIDA(VTable[i], std::get<0>(Pattern), std::get<1>(Pattern))) {
-                    c.PredefinedMethods.push_back(GeneratorPredefinedMethod::Inline(tfm::format(std::get<2>(Pattern), i)));
+
+                // If this is a thunk, set the search base to the thunk target.
+                void* SearchBase;
+                if (*static_cast<uint8_t*>(VTable[i]) == 0xE9) {
+                    SearchBase = utils::GetJmpTargetAddress(VTable[i]);
+                } else {
+                    SearchBase = VTable[i];
+                }
+                //LOG_INFO(_XOR_("Search pattern \"%s\" in %s VTable[%d]: 0x%p"), Pattern.Pattern.c_str(), c.FullName.c_str(), i, SearchBase);
+                //if (i == 102) {
+                //    LOG_INFO(_XOR_("UClass::CreateDefaultObject instructions = {"));
+                //    std::string BufString = utils::FormatBuffer((const uint8_t*)SearchBase, 1024);
+                //    for (auto Line : utils::SplitString(BufString, '\n'))
+                //        LOG_INFO("%s", Line.c_str());
+                //    LOG_INFO(_XOR_("};"));
+                //}
+
+                // Search for the pattern in this virtual function.
+                if (utils::FindPatternIDA(SearchBase, Pattern.SearchSize, Pattern.Pattern)) {
+
+                    LOG_INFO(_XOR_("FOUND pattern \"%s\" in %s VTable[%d] !!!"), Pattern.Pattern.c_str(), c.FullName.c_str(), i);
+
+                    // Add to the predefined methods for this class if the search was successful.
+                    c.PredefinedMethods.push_back(
+                        GeneratorPredefinedMethod::Inline(tfm::format(Pattern.Function.c_str(), i)));
                     break;
                 }
             }
@@ -469,15 +515,15 @@ void GeneratorPackage::GenerateClass(const ClassProxy& ClassObj)
     Classes.emplace_back(std::move(c));
 }
 
-void GeneratorPackage::GenerateScriptStruct(const ScriptStructProxy& ScriptStruct)
+void GeneratorPackage::GenerateScriptStruct(const UScriptStruct* ScriptStruct)
 {
     GeneratorScriptStruct ss;
-    ss.Name = ScriptStruct.GetName();
-    ss.FullName = ScriptStruct.GetFullName();
+    ss.Name = ScriptStruct->GetName();
+    ss.FullName = ScriptStruct->GetFullName();
 
-    LOG_DBG_PRINT("ScriptStruct: %-100s - instance: 0x%p\n", ss.Name.c_str(), ScriptStruct.GetAddress());
+    LOG_DBG_PRINT("ScriptStruct: %-100s - instance: 0x%p\n", ss.Name.c_str(), ScriptStruct);
 
-    ss.NameCpp = MakeValidName(ScriptStruct.GetNameCPP());
+    ss.NameCpp = MakeValidName(ScriptStruct->GetNameCPP());
     ss.NameCppFull = _XORSTR_("struct ");
 
     // Some classes need special alignment
@@ -486,118 +532,123 @@ void GeneratorPackage::GenerateScriptStruct(const ScriptStructProxy& ScriptStruc
         ss.NameCppFull += tfm::format(_XOR_("alignas(%d) "), Alignment);
     }
 
-    ss.NameCppFull += MakeUniqueCppName(ScriptStruct.Get<UStruct>());
-    ss.Size = ScriptStruct.GetPropertiesSize();
+    ss.NameCppFull += MakeUniqueCppName(static_cast<const UStruct*>(ScriptStruct));
+    ss.Size = ScriptStruct->GetPropertiesSize();
     ss.InheritedSize = 0;
 
     int32_t Offset = 0;
-    StructProxy SuperStruct = ScriptStruct.GetSuper();
-    if (SuperStruct.IsValid() && SuperStruct.GetAddress() != ScriptStruct.GetAddress()) {
-        ss.InheritedSize = Offset = SuperStruct.GetPropertiesSize();
-        ss.NameCppFull += _XORSTR_(" : public ") + MakeUniqueCppName(SuperStruct.Get<UStruct>());
+    const UStruct* SuperStruct = ScriptStruct->GetSuper();
+    if (SuperStruct && SuperStruct != ScriptStruct) {
+        ss.InheritedSize = Offset = SuperStruct->GetPropertiesSize();
+        ss.NameCppFull += _XORSTR_(" : public ") + MakeUniqueCppName(SuperStruct);
     }
 
-    std::vector<PropertyProxy> Props;
-    FieldProxy ScriptStructChildren = ScriptStruct.GetChildren();
-    PropertyProxy Prop = ScriptStructChildren.Cast<PropertyProxy>();
-    while (Prop.IsValid()) {
-        if (Prop.GetElementSize() > 0 &&
-            !Prop.IsA<ScriptStructProxy>() &&
-            !Prop.IsA<FunctionProxy>() &&
-            !Prop.IsA<EnumProxy>()) {
+    std::vector<UProperty*> Props;
+    UProperty* Prop = static_cast<UProperty*>(ScriptStruct->GetChildren());
+    while (Prop) {
+        if (Prop->GetElementSize() > 0 &&
+            !Prop->IsA<UScriptStruct>() &&
+            !Prop->IsA<UFunction>() &&
+            !Prop->IsA<UEnum>()) {
             Props.push_back(Prop);
         }
-        Prop = FieldProxy(Prop.GetNext()).Cast<PropertyProxy>();
+        Prop = static_cast<UProperty*>(Prop->GetNext());
     }
     std::sort(std::begin(Props), std::end(Props), ComparePropertyLess);
 
     GenerateMembers(ScriptStruct, Offset, Props, ss.Members);
 
-    Generator->GetPredefinedClassMethods(ScriptStruct.GetFullName(), ss.PredefinedMethods);
+    Generator->GetPredefinedClassMethods(ScriptStruct->GetFullName(), ss.PredefinedMethods);
 
     ScriptStructs.emplace_back(std::move(ss));
 }
 
-void GeneratorPackage::GenerateMemberPrerequisites(const PropertyProxy& First, std::unordered_map<const UObject*, bool>& ProcessedObjects)
+void GeneratorPackage::GenerateMemberPrerequisites(const UProperty* First, std::unordered_map<const UObject*, bool>& ProcessedObjects)
 {
-    using namespace cpplinq;
+    UProperty* Prop = const_cast<UProperty*>(First);
+    while (Prop) {
 
-    PropertyProxy Prop = First;
-    while (Prop.IsValid()) {
+        const UProperty::Info PropInfo = Prop->GetInfo();
 
-        const PropertyInfo PropInfo = Prop.GetInfo();
+        if (PropInfo.Type == UProperty::PropertyType::Primitive) {
 
-        if (PropInfo.Type == PropertyType::Primitive) {
+            if (Prop->IsA<UByteProperty>()) {
 
-            if (Prop.IsA<BytePropertyProxy>()) {
-
-                BytePropertyProxy ByteProperty = Prop.Cast<BytePropertyProxy>();
-                if (ByteProperty.IsEnum()) {
-                    ObjectProxy Enum = ByteProperty.GetEnum();
-                    AddDependency(Enum.GetOutermost());
+                UByteProperty* ByteProperty = static_cast<UByteProperty*>(Prop);
+                if (ByteProperty->IsEnum()) {
+                    UEnum* Enum = ByteProperty->GetEnum();
+                    if (Enum) {
+                        AddDependency(Enum->GetOutermost());
+                    }
                 }
 
-            } else if (Prop.IsA<EnumPropertyProxy>()) {
+            } else if (Prop->IsA<UEnumProperty>()) {
 
-                EnumPropertyProxy EnumProperty = Prop.Cast<EnumPropertyProxy>();
-                ObjectProxy Enum = EnumProperty.GetEnum();
-                AddDependency(Enum.GetOutermost());
+                UEnumProperty* EnumProperty = static_cast<UEnumProperty*>(Prop);
+                UEnum* Enum = EnumProperty->GetEnum();
+                if (Enum) {
+                    AddDependency(Enum->GetOutermost());
+                }
             }
 
-        } else if (PropInfo.Type == PropertyType::CustomStruct) {
+        } else if (PropInfo.Type == UProperty::PropertyType::CustomStruct) {
 
-            GeneratePrerequisites(Prop.Cast<StructPropertyProxy>().GetStruct(), ProcessedObjects);
+            GeneratePrerequisites(static_cast<UStructProperty*>(Prop)->GetStruct(), ProcessedObjects);
 
-        } else if (PropInfo.Type == PropertyType::Container) {
+        } else if (PropInfo.Type == UProperty::PropertyType::Container) {
 
-            std::vector<PropertyProxy> InnerProperties;
-            if (Prop.IsA<ArrayPropertyProxy>()) {
-                InnerProperties.push_back(Prop.Cast<ArrayPropertyProxy>().GetInner());
-            } else if (Prop.IsA<MapPropertyProxy>()) {
-                MapPropertyProxy MapProp = Prop.Cast<MapPropertyProxy>();
-                InnerProperties.push_back(MapProp.GetKeyProperty());
-                InnerProperties.push_back(MapProp.GetValueProperty());
+            std::vector<UProperty*> InnerProperties;
+            if (Prop->IsA<UArrayProperty>()) {
+
+                UArrayProperty* ArrayProp = static_cast<UArrayProperty*>(Prop);
+                InnerProperties.push_back(ArrayProp->GetInner());
+
+            } else if (Prop->IsA<UMapProperty>()) {
+
+                UMapProperty* MapProp = static_cast<UMapProperty*>(Prop);
+                InnerProperties.push_back(MapProp->GetKeyProperty());
+                InnerProperties.push_back(MapProp->GetValueProperty());
             }
 
-            for (PropertyProxy InnerProp : from(InnerProperties)
-                 >> where([](auto&& p) { return p.GetInfo().Type == PropertyType::CustomStruct; })
+            for (UProperty* InnerProp : from(InnerProperties)
+                 >> where([](auto&& p) { return p->GetInfo().Type == UProperty::PropertyType::CustomStruct; })
                  >> experimental::container()) {
-                GeneratePrerequisites(InnerProp.Cast<StructPropertyProxy>().GetStruct(), ProcessedObjects);
+                GeneratePrerequisites(static_cast<UStructProperty*>(InnerProp)->GetStruct(), ProcessedObjects);
             }
 
-        } else if (Prop.IsA<FunctionProxy>()) {
+        } else if (Prop->IsA<UFunction>()) {
 
-            FunctionProxy Function = Prop.Cast<FunctionProxy>();
-            FieldProxy FunctionChildren = Function.GetChildren();
-            GenerateMemberPrerequisites(FunctionChildren.Cast<PropertyProxy>(), ProcessedObjects);
+            UFunction* Function = Prop->Cast<UFunction>();
+            UField* FunctionChildren = Function->GetChildren();
+            GenerateMemberPrerequisites(FunctionChildren->Cast<UProperty>(), ProcessedObjects);
         }
 
-        Prop = FieldProxy(Prop.GetNext()).Cast<PropertyProxy>();
+        Prop = static_cast<UProperty*>(Prop->GetNext());
     }
 }
 
-void GeneratorPackage::GeneratePrerequisites(const ObjectProxy& Obj, std::unordered_map<const UObject*, bool>& ProcessedObjects)
+void GeneratorPackage::GeneratePrerequisites(const UObject* Obj, std::unordered_map<const UObject*, bool>& ProcessedObjects)
 {
-    if (!Obj.IsValid()) {
+    if (!Obj) {
         return;
     }
 
-    const bool isClass = Obj.IsA<ClassProxy>();
-    const bool isScriptStruct = Obj.IsA<ScriptStructProxy>();
+    const bool isClass = Obj->IsA<UClass>();
+    const bool isScriptStruct = Obj->IsA<UScriptStruct>();
     if (!isClass && !isScriptStruct) {
         return;
     }
 
-    const std::string ObjNameString = Obj.GetName();
+    const std::string ObjNameString = Obj->GetName();
     if (ObjNameString.find(_XOR_("Default__")) != std::string::npos ||
         ObjNameString.find(_XOR_("<uninitialized>")) != std::string::npos ||
         ObjNameString.find(_XOR_("PLACEHOLDER-CLASS")) != std::string::npos) {
         return;
     }
 
-    ProcessedObjects[Obj.GetConstPtr()] |= false;
+    ProcessedObjects[Obj] |= false;
 
-    const UPackage* ClassPackage = Obj.GetOutermost();
+    const UPackage* ClassPackage = Obj->GetOutermost();
     if (!ClassPackage) {
         return;
     }
@@ -606,53 +657,53 @@ void GeneratorPackage::GeneratePrerequisites(const ObjectProxy& Obj, std::unorde
         return;
     }
 
-    if (ProcessedObjects[Obj.GetConstPtr()] == false) {
-        ProcessedObjects[Obj.GetConstPtr()] = true;
+    if (ProcessedObjects[Obj] == false) {
+        ProcessedObjects[Obj] = true;
 
         if (!isScriptStruct) {
-            ObjectProxy Outer = Obj.GetOuter();
-            if (Outer.IsValid() && Outer != Obj) {
+            const UObject* Outer = Obj->GetOuter();
+            if (Outer && Outer != Obj) {
                 GeneratePrerequisites(Outer, ProcessedObjects);
             }
         }
 
-        StructProxy StructObj = Obj.Cast<StructProxy>();
-        StructProxy SuperStruct = StructObj.GetSuper();
-        if (SuperStruct.IsValid() && SuperStruct != Obj) {
+        const UStruct* StructObj = Obj->Cast<UStruct>();
+        const UStruct* SuperStruct = StructObj->GetSuper();
+        if (SuperStruct && SuperStruct != Obj) {
             GeneratePrerequisites(SuperStruct, ProcessedObjects);
         }
 
-        FieldProxy StructChildren = StructObj.GetChildren();
-        GenerateMemberPrerequisites(StructChildren.Cast<PropertyProxy>(), ProcessedObjects);
+        UField* StructChildren = StructObj->GetChildren();
+        GenerateMemberPrerequisites(static_cast<UProperty*>(StructChildren), ProcessedObjects);
 
         if (isClass) {
-            GenerateClass(Obj.Cast<ClassProxy>());
+            GenerateClass(static_cast<const UClass*>(Obj));
         } else {
-            GenerateScriptStruct(Obj.Cast<ScriptStructProxy>());
+            GenerateScriptStruct(static_cast<const UScriptStruct*>(Obj));
         }
     }
 }
 
 void GeneratorPackage::Process(const ObjectsProxy& Objects, std::unordered_map<const UObject*, bool>& ProcessedObjects)
 {
-    for (ObjectProxy Object : Objects) {
-        if (Object.IsValid()) {
-            const UPackage* Package = Object.GetOutermost();
-            if (PackageObject == Package) {
+    for (UObject* Object : Objects) {
+        if (Object) {
+            const UPackage* Package = Object->GetOutermost();
+            if (Package && Package == PackageObject) {
 
-                if (Object.IsA<EnumProxy>()) {
+                if (Object->IsA<UEnum>()) {
 
-                    //LOG_INFO("Processing enum \"%s\"...\n", Object.GetFullName().c_str());
-                    GenerateEnum(Object.Cast<EnumProxy>());
+                    //LOG_INFO("Processing enum \"%s\"...\n", Object->GetFullName().c_str());
+                    GenerateEnum(static_cast<UEnum*>(Object));
 
-                } else if (Object.IsA<ClassProxy>()) {
+                } else if (Object->IsA<UClass>()) {
 
-                    //LOG_INFO("Processing class \"%s\"...\n", Object.GetFullName().c_str());
+                    //LOG_INFO("Processing class \"%s\"...\n", Object->GetFullName().c_str());
                     GeneratePrerequisites(Object, ProcessedObjects);
 
-                } else if (Object.IsA<ScriptStructProxy>()) {
+                } else if (Object->IsA<UScriptStruct>()) {
 
-                    //LOG_INFO("Processing struct \"%s\"...\n", Object.GetFullName().c_str());
+                    //LOG_INFO("Processing struct \"%s\"...\n", Object->GetFullName().c_str());
                     GeneratePrerequisites(Object, ProcessedObjects);
                 }
             }
@@ -667,8 +718,6 @@ void GeneratorPackage::PrintConstant(std::ostream& os, const std::pair<std::stri
 
 void GeneratorPackage::PrintEnum(std::ostream& os, const GeneratorEnum& Enum) const
 {
-    using namespace cpplinq;
-
     os << "// " << Enum.FullName << _XORSTR_("\nenum class ") << Enum.Name << _XORSTR_(" : uint8_t {\n");
     os << (from(Enum.Values)
            >> select([](auto&& name, auto&& i) { return tfm::format(_XOR_("    %-30s = %d"), name, i); })
@@ -678,8 +727,6 @@ void GeneratorPackage::PrintEnum(std::ostream& os, const GeneratorEnum& Enum) co
 
 void GeneratorPackage::PrintStruct(std::ostream& os, const GeneratorScriptStruct& ScriptStruct) const
 {
-    using namespace cpplinq;
-
     os << "// " << ScriptStruct.FullName << "\n// ";
     if (ScriptStruct.InheritedSize) {
         os << tfm::format(_XOR_("0x%04X (0x%04X - 0x%04X)\n"), ScriptStruct.Size - ScriptStruct.InheritedSize, ScriptStruct.Size, ScriptStruct.InheritedSize);
@@ -713,13 +760,11 @@ void GeneratorPackage::PrintStruct(std::ostream& os, const GeneratorScriptStruct
     os << _XORSTR_("};\n");
 }
 
-std::string BuildMethodSignature(const GeneratorMethod& m, const GeneratorClass& c, bool inHeader)
+std::string GeneratorPackage::BuildMethodSignature(const GeneratorClass* c, const GeneratorMethod& m, bool inHeader) const
 {
-    using namespace cpplinq;
-
     std::ostringstream ss;
 
-    if (m.IsStatic && inHeader) {
+    if (m.IsStatic && inHeader && !Generator->ShouldConvertStaticMethods()) {
         ss << _XORSTR_("static ");
     }
 
@@ -732,54 +777,69 @@ std::string BuildMethodSignature(const GeneratorMethod& m, const GeneratorClass&
     }
     ss << ' ';
 
-    if (!inHeader) {
-        ss << c.NameCpp << _XORSTR_("::");
+    if (!inHeader && c != nullptr) {
+        ss << c->NameCpp << _XORSTR_("::");
     }
-    if (m.IsStatic) {
+    if (m.IsStatic && Generator->ShouldConvertStaticMethods()) {
         ss << _XORSTR_("STATIC_");
     }
     ss << m.Name;
 
     // Parameters
     ss << '(';
-    ss << (from(m.Parameters)
-           >> where([](auto&& param) { return param.ParamType != GeneratorParameter::Type::Return; })
-           >> orderby([](auto&& param) { return param.ParamType; })
-           >> select([](auto&& param) { return (param.PassByReference ? _XOR_("const ") : "") + param.CppType + (param.PassByReference ? "& " : param.ParamType == GeneratorParameter::Type::Out ? "* " : " ") + param.Name; })
-           >> concatenate(", "));
+    ss << (from(m.Parameters) >>
+           where([](auto&& param) { return param.ParamType != GeneratorParameter::Type::Return; }) >>
+           orderby([](auto&& param) { return param.ParamType; }) >>
+           select([](auto&& param) { return (param.PassByReference ? _XOR_("const ") : "") + 
+                                            param.CppType +
+                                            (param.PassByReference ? _XOR_("& ") : param.ParamType == GeneratorParameter::Type::Out ? _XOR_("* ") : " ") +
+                                            param.Name; }) >>
+           concatenate(", "));
     ss << ')';
 
     return ss.str();
 }
 
-std::string BuildMethodBody(const GeneratorClass& c, const GeneratorMethod& m)
+std::string GeneratorPackage::BuildMethodBody(const GeneratorClass* c, const GeneratorMethod& m) const
 {
-    using namespace cpplinq;
-
     std::ostringstream ss;
 
     // Function Pointer
     ss << _XORSTR_("{\n    /*static*/ auto fn");
 
-//if (generator->ShouldUseStrings()) {
-    ss << _XORSTR_(" = UObject::FindObject<UFunction>(");
-    ss << '\"' << m.FullName << '\"';
-    ss << _XORSTR_(");\n\n");
-//} else {
-//    ss << _XORSTR_(" = UObject::GetObjectCasted<UFunction>(") << m.Index << _XORSTR_(");\n\n");
-//}
+    if (Generator->ShouldUseStrings()) {
+
+        ss << _XORSTR_(" = UObject::FindObject<UFunction>(");
+        if (Generator->ShouldXorStrings()) {
+            ss << _XORSTR_("_XOR_(\"") << m.FullName << _XORSTR_("\")");
+        } else {
+            ss << '\"' << m.FullName << '\"';
+        }
+        ss << _XORSTR_(");\n\n");
+
+    } else {
+
+       ss << _XORSTR_(" = UObject::GetObjectCasted<UFunction>(") << m.Index << _XORSTR_(");\n\n");
+    }
 
     // Parameters
-    ss << _XORSTR_("    struct {\n");
-    for (auto&& param : m.Parameters) {
-        tfm::format(ss, _XOR_("        %-30s %s;\n"), param.CppType, param.Name);
+    if (Generator->ShouldGenerateFunctionParametersFile() && c != nullptr) {
+    
+        ss << _XORSTR_("    ") << c->NameCpp << '_' << m.Name << _XORSTR_("_Params params;\n");
+    
+    } else {
+
+        ss << _XORSTR_("    struct {\n");
+        for (auto&& param : m.Parameters) {
+            tfm::format(ss, _XOR_("        %-30s %s;\n"), param.CppType, param.Name);
+        }
+        ss << _XORSTR_("    } params;\n");
     }
-    ss << _XORSTR_("    } params;\n");
 
     auto defaultParameters = from(m.Parameters) >> where([](auto&& param) { return param.ParamType == GeneratorParameter::Type::Default; });
     if (defaultParameters >> any()) {
         for (auto&& param : defaultParameters >> experimental::container()) {
-            ss << _XORSTR_("    params.") << param.Name << " = " << param.Name << ";\n";
+            ss << _XORSTR_("    params.") << param.Name << _XORSTR_(" = ") << param.Name << _XORSTR_(";\n");
         }
     }
     ss << '\n';
@@ -792,10 +852,13 @@ std::string BuildMethodBody(const GeneratorClass& c, const GeneratorMethod& m)
     }
     ss << '\n';
 
-    if (m.IsStatic) {
+    if (m.IsStatic && !Generator->ShouldConvertStaticMethods()) {
+
         ss << _XORSTR_("    /*static*/ auto DefaultObj = StaticClass()->CreateDefaultObject();\n");
         ss << _XORSTR_("    DefaultObj->ProcessEvent(fn, &params);\n\n");
+
     } else {
+
         ss << _XORSTR_("    UObject::ProcessEvent(fn, &params);\n\n");
     }
     ss << _XORSTR_("    fn->FunctionFlags = flags;\n");
@@ -823,8 +886,6 @@ std::string BuildMethodBody(const GeneratorClass& c, const GeneratorMethod& m)
 
 void GeneratorPackage::PrintClass(std::ostream& os, const GeneratorClass& Class) const
 {
-    using namespace cpplinq;
-
     os << "// " << Class.FullName << _XORSTR_("\n// ");
     if (Class.InheritedSize) {
         tfm::format(os, _XOR_("0x%04X (0x%04X - 0x%04X)\n"),
@@ -835,15 +896,51 @@ void GeneratorPackage::PrintClass(std::ostream& os, const GeneratorClass& Class)
     os << Class.NameCppFull << _XORSTR_(" {\npublic:\n");
 
     // Members
+    uint32_t Offset = Class.InheritedSize;
+    uint32_t Size = 0;
     for (auto&& m : Class.Members) {
-        tfm::format(os, _XOR_("    %-50s %-58s// 0x%04X(0x%04X)"), m.Type, m.Name + ';', m.Offset, m.Size);
+
+        uint32_t PrevOffset = Offset;
+        uint32_t PrevSize = Size;
+        Offset = m.Offset;
+        Size = m.Size;
+
+        // Print padding field to fill in space, if needed.
+        if (Class.bMembersPredefined) {
+            if (PrevOffset + PrevSize < Offset) {
+                size_t PaddingOffset = PrevOffset + PrevSize;
+                size_t PaddingSize = Offset - PaddingOffset;
+                std::string PaddingName = tfm::format(_XOR_("UnknownData0x%04X[0x%X]"), PaddingOffset, PaddingSize);
+                tfm::format(os, _XOR_("    %-50s %-58s// 0x%04X(0x%04X) PADDING\n"),
+                            _XOR_("uint8_t"), PaddingName + ';', PaddingOffset, PaddingSize);
+            }
+        }
+
+        // Print the field itself.
+        if (!m.Size) {
+            tfm::format(os, _XOR_("    %-50s %-58s//"), m.Type, m.Name + ';');
+        } else {
+            tfm::format(os, _XOR_("    %-50s %-58s// 0x%04X(0x%04X)"), m.Type, m.Name + ';', Offset, Size);
+        }
+        // Print comments.
         if (!m.Comment.empty()) {
             os << ' ' << m.Comment;
         }
+        // Print flags string.
         if (!m.FlagsString.empty()) {
             os << " (" << m.FlagsString << ')';
         }
         os << '\n';
+    }
+    // Print last padding field, if needed.
+    if (Class.bMembersPredefined) {
+        if (Class.Size > Offset + Size) {
+            size_t PaddingOffset = Offset + Size;
+            size_t PaddingSize = Class.Size - (Offset + Size);
+            std::string PaddingName = tfm::format(_XOR_("UnknownData0x%04X[0x%X]"), PaddingOffset, PaddingSize);
+            tfm::format(os, _XOR_("    %-50s %-58s// 0x%04X(0x%04X) PADDING\n"),
+                        _XOR_("uint8_t"), PaddingName + ';', PaddingOffset, PaddingSize);
+        }
     }
 
     // Predefined methods.
@@ -863,7 +960,7 @@ void GeneratorPackage::PrintClass(std::ostream& os, const GeneratorClass& Class)
     if (!Class.Methods.empty()) {
         os << '\n';
         for (auto&& m : Class.Methods) {
-            os << _XORSTR_("    ") << BuildMethodSignature(m, {}, true) << _XORSTR_(";\n");
+            os << _XORSTR_("    ") << BuildMethodSignature(nullptr, m, true) << _XORSTR_(";\n");
         }
     }
 
@@ -872,10 +969,8 @@ void GeneratorPackage::PrintClass(std::ostream& os, const GeneratorClass& Class)
 
 void GeneratorPackage::SaveStructs(const std::experimental::filesystem::path& SdkPath) const
 {
-    using namespace cpplinq;
-
     std::ofstream os(SdkPath / GenerateFileName(FileContentType::Structs, GetPackageObject()));
-    std::vector<std::string> includes{ { tfm::format(_XOR_("PUBG_Basic.h")) } };
+    std::vector<std::string> includes{ { tfm::format(_XOR_("Types.h")) } };
     auto dependencyNames = from(DependencyObjects)
         >> select([](auto&& p) { return GenerateFileName(FileContentType::Classes, p); })
         >> experimental::container();
@@ -953,16 +1048,16 @@ void GeneratorPackage::SaveFunctions(const std::experimental::filesystem::path& 
         }
         // Generate methods.
         for (auto&& m : c.Methods) {
-            os << "// " << m.FullName << '\n' << "// (" << m.FlagsString << ")\n";
+            os << "// " << m.FullName << '\n' << "// (" << m.FlagsString << ")";
             if (!m.Parameters.empty()) {
-                os << _XORSTR_("// Parameters:\n");
+                os << _XORSTR_("\n// Parameters:");
                 for (auto&& param : m.Parameters) {
-                    tfm::format(os, _XOR_("// %-30s %-30s (%s)\n"), param.CppType, param.Name, param.FlagsString);
+                    tfm::format(os, _XOR_("\n// %-30s %-30s (%s)"), param.CppType, param.Name, param.FlagsString);
                 }
             }
             os << '\n';
-            os << BuildMethodSignature(m, c, false) << '\n';
-            os << BuildMethodBody(c, m) << "\n\n";
+            os << BuildMethodSignature(&c, m, false) << '\n';
+            os << BuildMethodBody(&c, m) << "\n\n";
         }
     }
 
@@ -971,10 +1066,7 @@ void GeneratorPackage::SaveFunctions(const std::experimental::filesystem::path& 
 
 void GeneratorPackage::SaveFunctionParameters(const std::experimental::filesystem::path& path) const
 {
-    using namespace cpplinq;
-
     std::ofstream os(path / GenerateFileName(FileContentType::FunctionParameters, GetPackageObject()));
-
     PrintFileHeader(os, { _XORSTR_("\"../sdk.h\"") }, true);
     PrintSectionHeader(os, _XOR_("Parameters"));
 
@@ -992,13 +1084,13 @@ void GeneratorPackage::SaveFunctionParameters(const std::experimental::filesyste
     PrintFileFooter(os);
 }
 
-bool GeneratorPackage::Save(const std::experimental::filesystem::path& SdkPath) const
+bool GeneratorPackage::Save() const
 {
-    using namespace cpplinq;
+    std::experimental::filesystem::path SdkPath = Generator->GetPath() / "gen";
 
-    if (from(Enums) >> where([](auto&& e) { return !e.Values.empty(); }) >> any() ||
-        from(ScriptStructs) >> where([](auto&& s) { return !s.Members.empty() || !s.PredefinedMethods.empty(); }) >> any() ||
-        from(Classes) >> where([](auto&& c) { return !c.Members.empty() || !c.PredefinedMethods.empty() || !c.Methods.empty(); }) >> any())
+    if ((from(Enums) >> where([](auto&& e) { return !e.Values.empty(); }) >> any()) ||
+        (from(ScriptStructs) >> where([](auto&& s) { return !s.Members.empty() || !s.PredefinedMethods.empty(); }) >> any()) ||
+        (from(Classes) >> where([](auto&& c) { return !c.Members.empty() || !c.PredefinedMethods.empty() || !c.Methods.empty(); }) >> any()))
     {
         SaveStructs(SdkPath);
         SaveClasses(SdkPath);
@@ -1011,26 +1103,24 @@ bool GeneratorPackage::Save(const std::experimental::filesystem::path& SdkPath) 
 }
 
 void Generator::SaveSdkHeader(
-    const std::experimental::filesystem::path& Path,
     const std::unordered_map<const UObject*, bool>& ProcessedObjects,
     const std::vector<std::unique_ptr<GeneratorPackage>>& Packages
 )
 {
-    std::ofstream os(Path / "sdk.h");
+    const std::experimental::filesystem::path& path = GetPath();
+    std::ofstream os(path / "sdk.h");
     os << _XORSTR_("#pragma once\n\n") << tfm::format(_XOR_("// PUBG UE4 SDK\n\n"));
-
-    using namespace cpplinq;
 
     //check for missing structs
     const auto missing = from(ProcessedObjects) >> where([](auto&& kv) { return kv.second == false; });
     if (missing >> any()) {
-        std::ofstream os2(Path / "gen" / tfm::format(_XOR_("PUBG_MISSING.h")));
+        std::ofstream os2(path / "gen" / tfm::format(_XOR_("PUBG_MISSING.h")));
         PrintFileHeader(os2, true);
-        for (auto&& s : missing >> select([](auto&& kv) { return ObjectProxy(kv.first).Cast<StructProxy>(); }) >> experimental::container()) {
-            os2 << "// " << s.GetFullName() << _XORSTR_("\n// ");
-            os2 << tfm::format("0x%04X\n", s.GetPropertiesSize());
-            os2 << _XORSTR_("struct ") << MakeValidName(s.GetNameCPP()) << "\n{\n";
-            os2 << _XORSTR_("    uint8_t UnknownData[0x") << tfm::format("%X", s.GetPropertiesSize()) << _XORSTR_("];\n};\n\n");
+        for (auto&& s : missing >> select([](auto&& kv) { return static_cast<const UStruct*>(kv.first); }) >> experimental::container()) {
+            os2 << "// " << s->GetFullName() << _XORSTR_("\n// ");
+            os2 << tfm::format("0x%04X\n", s->GetPropertiesSize());
+            os2 << _XORSTR_("struct ") << MakeValidName(s->GetNameCPP()) << "\n{\n";
+            os2 << _XORSTR_("    uint8_t UnknownData[0x") << tfm::format("%X", s->GetPropertiesSize()) << _XORSTR_("];\n};\n\n");
         }
         PrintFileFooter(os2);
         os << _XORSTR_("\n#include \"gen/") << tfm::format(_XOR_("PUBG_MISSING.h")) << "\"\n";
@@ -1041,19 +1131,17 @@ void Generator::SaveSdkHeader(
     }
 }
 
-void Generator::ProcessPackages(const std::experimental::filesystem::path& path)
+bool Generator::Generate()
 {
-    using namespace cpplinq;
-
-    const auto SdkPath = path / "gen";
-    std::experimental::filesystem::create_directories(SdkPath);
+    // Create the generated sdk 
+    std::experimental::filesystem::create_directories(GetPath() / "gen");
 
     std::vector<std::unique_ptr<GeneratorPackage>> Packages;
     std::unordered_map<const UObject*, bool> ProcessedObjects;
 
     ObjectsProxy Objects;
     std::vector<const UPackage*> PackageObjects = from(Objects)
-        >> select([](auto&& o) { return o.GetOutermost(); })
+        >> select([](auto&& o) { return o->GetOutermost(); })
         >> where([](auto&& o) { return o != nullptr; })
         >> distinct()
         >> to_vector();
@@ -1076,11 +1164,17 @@ void Generator::ProcessPackages(const std::experimental::filesystem::path& path)
     //LOG_INFO(_XOR_("MADEIT4"));
     //LOG_DBG_PRINT("DONE\n");
 
+    // Generate classes, structs, and enums for each package object.
     for (const UPackage* PackageObject : PackageObjects) {
-        //GeneratorPackage Package(PackageObject);
-        auto Package = std::make_unique<GeneratorPackage>(this, PackageObject);
+
+        // Create new generator package object.
+        std::unique_ptr<GeneratorPackage> Package = std::make_unique<GeneratorPackage>(
+                                                                    this, PackageObject);
+        // Process this package
         Package->Process(Objects, ProcessedObjects);
-        if (Package->Save(SdkPath)) {
+
+        // Save the generated classes, structs, and enums of this package.
+        if (Package->Save()) {
             Generator::PackageMap[PackageObject] = Package.get();
             Packages.emplace_back(std::move(Package));
         }
@@ -1088,12 +1182,12 @@ void Generator::ProcessPackages(const std::experimental::filesystem::path& path)
 
     LOG_INFO(_XOR_("Donezo."));
 
+    // Sort the packages.
     if (!Packages.empty()) {
         // std::sort doesn't work, so use a simple bubble sort
-        //std::sort(std::begin(packages), std::end(packages), GeneratorPackageDependencyComparer());
         const GeneratorPackageDependencyComparer comparer;
-        for (auto i = 0u; i < Packages.size() - 1; ++i) {
-            for (auto j = 0u; j < Packages.size() - i - 1; ++j) {
+        for (size_t i = 0; i < Packages.size() - 1; ++i) {
+            for (size_t j = 0; j < Packages.size() - i - 1; ++j) {
                 if (!comparer(Packages[j], Packages[j + 1])) {
                     std::swap(Packages[j], Packages[j + 1]);
                 }
@@ -1101,5 +1195,8 @@ void Generator::ProcessPackages(const std::experimental::filesystem::path& path)
         }
     }
 
-    SaveSdkHeader(path, ProcessedObjects, Packages);
+    // Save the SDK header.
+    SaveSdkHeader(ProcessedObjects, Packages);
+
+    return true;
 }

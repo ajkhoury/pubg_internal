@@ -40,20 +40,21 @@ static std::string MakeValidName(std::string&& Name)
 }
 
 template<typename T>
-static std::string MakeUniqueCppNameImpl(const T& t)
+static std::string MakeUniqueCppNameImpl(const T* t)
 {
     std::string NameString;
-    if (ObjectsProxy().CountObjects<T>(t.GetName()) > 1) {
-        ObjectProxy OuterObj = t.GetOuter();
-        NameString = MakeValidName(OuterObj.GetName()) + "_";
+    if (ObjectsProxy().CountObjects<T>(t->GetName()) > 1) {
+        const UObject* OuterObj = t->GetOuter();
+        if (OuterObj != nullptr) {
+            NameString = MakeValidName(OuterObj->GetName()) + '_';
+        }
     }
-    return NameString + MakeValidName(t.GetName());
+    return NameString + MakeValidName(t->GetName());
 }
 
 static std::string MakeUniqueCppName(const UEnum* e)
 {
-    EnumProxy Enum(e);
-    std::string NameString = MakeUniqueCppNameImpl(Enum);
+    std::string NameString = MakeUniqueCppNameImpl(e);
     if (!NameString.empty() && NameString[0] != 'E') {
         NameString = 'E' + NameString;
     }
@@ -62,10 +63,12 @@ static std::string MakeUniqueCppName(const UEnum* e)
 
 static std::string MakeUniqueCppName(const UStruct* s)
 {
-    StructProxy Struct(s);
     std::string NameString;
-    if (ObjectsProxy().CountObjects<StructProxy>(Struct.GetName()) > 1) {
-        NameString = MakeValidName(ObjectProxy(Struct.GetOuter()).GetNameCPP()) + "_";
+    if (ObjectsProxy().CountObjects<UStruct>(s->GetName()) > 1) {
+        const UObject* OuterObj = s->GetOuter();
+        if (OuterObj != nullptr) {
+            NameString = MakeValidName(OuterObj->GetNameCPP()) + '_';
+        }
     }
-    return NameString + MakeValidName(Struct.GetNameCPP());
+    return NameString + MakeValidName(s->GetNameCPP());
 }

@@ -1,13 +1,12 @@
 #pragma once
 
-#include "Engine.h"
+#include "Types.h"
 
 class WorldProxy {
 public:
     WorldProxy();
 
     inline uint64_t *GetEncryptedPointerAddress() const { return WorldEncryptedPtr; }
-
     void *GetAddress() const;
 
 private:

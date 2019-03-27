@@ -10,48 +10,48 @@ DecryptObjectsAsm PROC
         sub     rsp, 8
         mov     rbp, rsp
 
-        mov     rdx,rcx
-        mov     ecx,edx
-        movzx   eax,dx
-        shr     ecx,10h
-        mov     r8,rdx
-        xor     ecx,eax
-        and     edx,0ffff0000h
-        shr     r8,20h
-        or      ecx,edx
-        add     ecx,01818b868h
-        movzx   eax,cx
-        mov     edx,ecx
-        and     ecx,0ffff0000h
-        shr     edx,10h
-        xor     edx,eax
-        or      edx,ecx
-        mov     ecx,r8d
-        shr     ecx,10h
-        xor     edx,01818b868h
-        xor     r8w,cx
-        mov     dword ptr [rbp],edx
-        movzx   eax,cx
-        rol     r8w,8
-        ror     ax,8
-        movzx   edx,ax
-        movzx   eax,r8w
-        shl     edx,10h
-        or      edx,eax
-        add     edx,017671768h
-        mov     ecx,edx
-        shr     ecx,10h
-        movzx   eax,cx
-        xor     cx,dx
-        ror     ax,8
-        rol     cx,8
-        movzx   r8d,ax
-        shl     r8d,10h
-        movzx   eax,cx
-        or      r8d,eax
-        xor     r8d,0e898e898h
-        mov     dword ptr [rbp+4],r8d
-        mov     rax,qword ptr [rbp]
+        mov     rdx, rcx
+        mov     ecx, edx
+        movzx   eax, dx
+        shr     ecx, 16
+        mov     r8, rdx
+        xor     ecx, eax
+        and     edx, 0ffff0000h
+        shr     r8, 32
+        or      ecx, edx
+        add     ecx, 01818b868h
+        movzx   eax, cx
+        mov     edx, ecx
+        and     ecx, 0ffff0000h
+        shr     edx, 16
+        xor     edx, eax
+        or      edx, ecx
+        mov     ecx, r8d
+        shr     ecx, 16
+        xor     edx, 01818b868h
+        xor     r8w, cx
+        mov     dword ptr [rbp], edx
+        movzx   eax, cx
+        rol     r8w, 8
+        ror     ax, 8
+        movzx   edx, ax
+        movzx   eax, r8w
+        shl     edx, 16
+        or      edx, eax
+        add     edx, 017671768h
+        mov     ecx, edx
+        shr     ecx, 16
+        movzx   eax, cx
+        xor     cx, dx
+        ror     ax, 8
+        rol     cx, 8
+        movzx   r8d, ax
+        shl     r8d, 16
+        movzx   eax, cx
+        or      r8d, eax
+        xor     r8d, 0e898e898h
+        mov     dword ptr [rbp+4], r8d
+        mov     rax, qword ptr [rbp]
 
         add     rsp, 8
         pop     rbp
@@ -72,9 +72,9 @@ DecryptObjectIndexAsm PROC
 
         mov     ebx, ecx
         xor     ebx, 0d898e095h
-        rol     ebx, 0dh
+        rol     ebx, 13
         mov     edi, ebx
-        shl     edi, 10h
+        shl     edi, 16
         xor     edi, ebx
         xor     edi, 091454e39h
         mov     eax, edi
@@ -151,7 +151,7 @@ DecryptObjectClassAsm PROC
         mov     rdi, rcx                    ; RDI = ClassEncrypted
         mov     rax, 09f7c4e3e9913b649h
         xor     rdi, rax
-        rol     rdi, 13h
+        rol     rdi, 19
         mov     rbx, rdi
         shl     rbx, 32
         mov     rax, 05f346a8b67ac8a1bh

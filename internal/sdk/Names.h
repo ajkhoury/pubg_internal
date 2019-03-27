@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Engine.h"
+#include "Types.h"
 
 class NamesProxy {
 public:

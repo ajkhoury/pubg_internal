@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Engine.h"
+#include "UnrealTypes.h"
 #include "Names.h"
 
 #include <native/log.h>
@@ -8,51 +8,8 @@
 #include <unordered_map>
 #include <type_traits>
 
-#define __XXSTRINGIFY(x) #x
-#define _XXSTRINGIFY(x) __XXSTRINGIFY(x)
-#define DECLARE_STATIC_CLASS(TClass) \
-    static const UClass* StaticClass() { \
-        /* LOG_INFO("StaticClass of " _XXSTRINGIFY(TClass)); */ \
-        if (!TClass##Class) \
-            TClass##Class = ObjectsProxy().FindClass("Class CoreUObject." _XXSTRINGIFY(TClass)); \
-        return TClass##Class; \
-    } \
-    static const UClass* TClass##Class
-
-#define DEFINE_STATIC_CLASS(TClass) \
-    const UClass* TClass##Proxy::TClass##Class = nullptr
-
-class FUObjectItem {
-public:
-    UObject *Object; // 0x00
-    int32_t Flags; // 0x08
-    int32_t ClusterIndex; // 0x0C
-    int32_t SerialNumber; // 0x10
-}; // size=0x18
-
-class ObjectIterator {
-public:
-    ObjectIterator(const int32_t InObjectIndex) : Index(InObjectIndex) {}
-    ObjectIterator(const ObjectIterator& Other) : Index(Other.Index) {}
-    ObjectIterator(ObjectIterator&& Other) noexcept : Index(Other.Index) {}
-
-    inline ObjectIterator& operator=(const ObjectIterator& rhs) { Index = rhs.Index; return *this; }
-    inline void swap(ObjectIterator& Other) noexcept { std::swap(Index, Other.Index); }
-
-    inline bool operator==(const ObjectIterator& rhs) const { return Index == rhs.Index; }
-    inline bool operator!=(const ObjectIterator& rhs) const { return Index != rhs.Index; }
-
-    inline ObjectIterator& operator++() { ++Index; return *this; }
-    inline ObjectIterator operator++(int) { auto tmp(*this); ++(*this); return tmp; }
-
-    class ObjectProxy operator*() const;
-    class ObjectProxy operator->() const;
-
-private:
-    int32_t Index;
-};
-
 class ObjectsProxy {
+    friend class ObjectIterator;
 public:
     ObjectsProxy();
 
@@ -72,127 +29,50 @@ public:
         return FindObject<UClass>(name);
     }
 
-    inline ObjectIterator begin() { return ObjectIterator(0); }
-    inline const ObjectIterator begin() const { return ObjectIterator(0); }
-    inline ObjectIterator end() { return ObjectIterator(GetNum()); }
-    inline const ObjectIterator end() const { return ObjectIterator(GetNum()); }
+    class ObjectIterator {
+    public:
+        ObjectIterator(const class ObjectsProxy* InObjects, const int32_t InObjectIndex) : Index(InObjectIndex), Objects(InObjects) {}
+        ObjectIterator(const ObjectIterator& Other) : Index(Other.Index), Objects(Other.Objects) {}
+        ObjectIterator(ObjectIterator&& Other) noexcept : Index(Other.Index), Objects(Other.Objects) {}
+
+        inline ObjectIterator& operator=(const ObjectIterator& rhs) { Index = rhs.Index; return *this; }
+        inline void swap(ObjectIterator& Other) noexcept { std::swap(Index, Other.Index); }
+
+        inline bool operator==(const ObjectIterator& rhs) const { return Index == rhs.Index; }
+        inline bool operator!=(const ObjectIterator& rhs) const { return Index != rhs.Index; }
+
+        inline ObjectIterator& operator++() { ++Index; return *this; }
+        inline ObjectIterator operator++(int) { auto tmp(*this); ++(*this); return tmp; }
+
+        inline UObject* operator*() const { return Objects->GetById(Index); }
+        inline UObject* operator->() const { return Objects->GetById(Index); }
+
+    private:
+        int32_t Index;
+        const class ObjectsProxy* Objects;
+    };
+
+    inline ObjectIterator begin() { return ObjectIterator(this, 0); }
+    inline const ObjectIterator begin() const { return ObjectIterator(this, 0); }
+    inline ObjectIterator end() { return ObjectIterator(this, GetNum()); }
+    inline const ObjectIterator end() const { return ObjectIterator(this, GetNum()); }
 
 private:
     FUObjectItem *GetObjectsPrivate() const;
-
-    /**
-     * STL-like iterators to enable range-based for loop support.
-     */
-    //inline friend ObjectIterator begin(ObjectsProxy& Objects) { return ObjectIterator(0); }
-    //inline friend const ObjectIterator begin(const ObjectsProxy& Objects) { return ObjectIterator(0); }
-    //inline friend ObjectIterator end(ObjectsProxy& Objects) { return ObjectIterator(Objects.GetNum()); }
-    //inline friend const ObjectIterator end(const ObjectsProxy& Objects) { return ObjectIterator(Objects.GetNum()); }
 
     void *ObjectArray;
 
     static std::unordered_map<std::string, int32_t> ObjectsCacheMap;
 };
 
-class ObjectProxy {
-public:
-    ObjectProxy()
-        : Object(nullptr)
-    {
-    }
-
-    ObjectProxy(const UObject* InObject)
-        : Object(const_cast<UObject*>(InObject))
-    {
-    }
-
-    inline ObjectProxy& operator=(UObject* InObject) { Object = InObject; return *this; }
-    inline ObjectProxy& operator=(const ObjectProxy& InProxy) { Object = InProxy.Object; return *this; }
-
-    inline UObject* GetPtr() const { return Object; }
-    inline const UObject* GetConstPtr() const { return const_cast<const UObject*>(Object); }
-    inline void *GetAddress() const { return (void *)Object; }
-    inline bool IsValid() const { return Object != nullptr; }
-
-    int32_t GetFlags() const;
-    uint32_t GetUniqueId() const;
-    UClass *GetClass() const;
-    UObject *GetOuter() const;
-    FName GetFName() const;
-
-    const UPackage* GetOutermost() const;
-
-    std::string GetName() const;
-    std::string GetFullName() const;
-
-    std::string GetNameCPP() const;
-
-    template<typename Type>
-    const Type* Get() const
-    {
-        static_assert(std::is_base_of<UObject, Type>::value == true, "Not a base of UObject!");
-        return static_cast<const Type*>(GetConstPtr());
-    }
-
-    template<typename Type>
-    Type* Get()
-    {
-        static_assert(std::is_base_of<UObject, Type>::value == true, "Not a base of UObject!");
-        return static_cast<Type*>(GetPtr());
-    }
-
-    template<typename ProxyBase>
-    ProxyBase Cast() const { return ProxyBase(Get<ProxyBase::Type>()); }
-
-    template<typename T>
-    bool IsA() const
-    {
-        const UClass* CmpClass = T::StaticClass();
-        if (CmpClass) {
-            UClass* SuperClass = GetClass();
-            while (SuperClass != nullptr) {
-                if (SuperClass == CmpClass) {
-                    return true;
-                }
-                SuperClass = static_cast<UClass*>(SuperClass->SuperStruct);
-            }
-        }
-
-        return false;
-    }
-
-    inline operator UObject*() const { return Object; }
-
-    inline UObject* operator->() { return Object; }
-    inline const UObject* operator->() const { return Object; }
-    inline UObject& operator*() { return *Object; }
-    inline const UObject& operator*() const { return *Object; }
-
-    DECLARE_STATIC_CLASS(Object);
-
-private:
-    UObject *Object;
-};
-
-namespace std {
-template<>
-struct hash<ObjectProxy> {
-    size_t operator()(const ObjectProxy& obj) const {
-        return std::hash<void*>()(obj.GetAddress());
-    }
-};
-}
-
-inline bool operator==(const ObjectProxy& lhs, const ObjectProxy& rhs) { return rhs.GetAddress() == lhs.GetAddress(); }
-inline bool operator!=(const ObjectProxy& lhs, const ObjectProxy& rhs) { return !(lhs == rhs); }
-
 template<typename T>
 T* ObjectsProxy::FindObject(const std::string& name) const
 {
     for (int32_t i = 0; i < GetNum(); ++i) {
-        ObjectProxy Object(GetById(i));
-        if (Object.IsValid()) {
-            if (Object.GetFullName() == name) {
-                return static_cast<T*>(Object.GetPtr());
+        UObject* Object = GetById(i);
+        if (Object != nullptr) {
+            if (Object->GetFullName() == name) {
+                return static_cast<T*>(Object);
             }
         }
     }
@@ -209,9 +89,9 @@ int32_t ObjectsProxy::CountObjects(const std::string& name) const
 
     int32_t Count = 0;
     for (int32_t i = 0; i < GetNum(); ++i) {
-        ObjectProxy Object = GetById(i);
-        if (Object.IsValid()) {
-            if (Object.IsA<T>() && Object.GetName() == name) {
+        UObject* Object = GetById(i);
+        if (Object != nullptr) {
+            if (Object->IsA<T>() && Object->GetName() == name) {
                 ++Count;
             }
         }
@@ -221,99 +101,7 @@ int32_t ObjectsProxy::CountObjects(const std::string& name) const
     return Count;
 }
 
-class FieldProxy : public ObjectProxy {
-public:
-    typedef UField Type;
-
-    FieldProxy(const UField* InField)
-        : ObjectProxy(InField)
-    {
-    }
-
-    inline UField *GetNext() const
-    {
-        return static_cast<const UField*>(GetConstPtr())->Next;
-    }
-
-    DECLARE_STATIC_CLASS(Field);
-};
-
-class EnumProxy : public FieldProxy {
-public:
-    typedef UEnum Type;
-
-    EnumProxy(const UEnum* InEnum)
-        : FieldProxy(InEnum)
-    {
-    }
-
-    inline std::vector<std::string> GetNames() const
-    {
-        NamesProxy Names;
-        std::vector<std::string> StringArray;
-        const TArray<TPair<FName, int64_t>>& NamesArray = Get<UEnum>()->Names;
-
-        //LOG_INFO("MADEIT1 - NamesArray.Num = %d", NamesArray.Num());
-
-        for (auto Name : NamesArray) {
-            int32_t Index = Name.Key.GetIndex();
-            //LOG_INFO("MADEIT2 - NamesArray[%d].Key.GetIndex() = %d", i, Index);
-            StringArray.push_back(Names.GetById(Index));
-        }
-
-        //LOG_INFO("MADEIT3");
-
-        return StringArray;
-    }
-
-    DECLARE_STATIC_CLASS(Enum);
-};
-
-class StructProxy : public FieldProxy {
-public:
-    typedef UStruct Type;
-
-    StructProxy(const UStruct* InStruct)
-        : FieldProxy(InStruct)
-    {
-    }
-
-    inline UStruct* GetSuper() const
-    {
-        return static_cast<const UStruct*>(GetConstPtr())->SuperStruct;
-    }
-
-    inline UField* GetChildren() const
-    {
-        return static_cast<const UStruct*>(GetConstPtr())->Children;
-    }
-
-    inline int32_t GetPropertiesSize() const
-    {
-        return static_cast<const UStruct*>(GetConstPtr())->PropertiesSize;
-    }
-
-    inline int32_t GetMinAlignment() const
-    {
-        return static_cast<const UStruct*>(GetConstPtr())->MinAlignment;
-    }
-
-    DECLARE_STATIC_CLASS(Struct);
-};
-
-class ScriptStructProxy : public StructProxy {
-public:
-    typedef UScriptStruct Type;
-
-    ScriptStructProxy(const UScriptStruct* InFunc)
-        : StructProxy(InFunc)
-    {
-    }
-
-    DECLARE_STATIC_CLASS(ScriptStruct);
-};
-
-enum class FunctionFlags : uint32_t {
+enum FunctionFlags : uint32_t {
     Final = 0x00000001,
     RequiredAPI = 0x00000002,
     BlueprintAuthorityOnly = 0x00000004,
@@ -344,39 +132,4 @@ enum class FunctionFlags : uint32_t {
     NetValidate = 0x80000000
 };
 
-inline bool operator&(FunctionFlags lhs, FunctionFlags rhs)
-{
-    return (static_cast<std::underlying_type_t<FunctionFlags>>(lhs) & static_cast<std::underlying_type_t<FunctionFlags>>(rhs))
-        == static_cast<std::underlying_type_t<FunctionFlags>>(rhs);
-}
-
-std::string StringifyFlags(const FunctionFlags Flags);
-
-class FunctionProxy : public StructProxy {
-public:
-    typedef UFunction Type;
-
-    FunctionProxy(const UFunction *InFunc)
-        : StructProxy(InFunc)
-    {
-    }
-
-    inline FunctionFlags GetFunctionFlags() const
-    {
-        return static_cast<FunctionFlags>(static_cast<const UFunction*>(GetConstPtr())->FunctionFlags);
-    }
-
-    DECLARE_STATIC_CLASS(Function);
-};
-
-class ClassProxy : public StructProxy {
-public:
-    typedef UClass Type;
-
-    ClassProxy(const UClass *InClass)
-        : StructProxy(InClass)
-    {
-    }
-
-    DECLARE_STATIC_CLASS(Class);
-};
+std::string StringifyFunctionFlags(const uint32_t Flags);

@@ -1,12 +1,13 @@
 #include "OffsetDumper.h"
+#include "tinyformat.h"
 
 #include <native/log.h>
 #include <utils/utils.h>
 #include <utils/disasm.h>
 #include <utils/xorstr.h>
 
-#include <map>
 #include <algorithm>
+#include <sstream>
 
 static const char* RegisterStrings[64] = {
     /* 64-bit registers */
@@ -51,57 +52,199 @@ static const char* RegisterStrings[64] = {
     } while(NextInst->opcode == I_CALL)
 
 
-namespace dumper {
+namespace unreal {
+
+ObjectSizeMapType ObjectSizeMap;
+
+int InitializeUnrealObjectSizeMap()
+{
+    void* ImageBase = utils::GetModuleHandleWIDE(nullptr /*0xC4D8736D TslGame.exe */);
+    uint32_t ImageSize = utils::GetModuleSize((HMODULE)ImageBase);
+    const uint8_t* SearchEnd = static_cast<uint8_t*>(ImageBase) + ImageSize;
+    uint8_t* SearchBase;
+    size_t SearchSize;
+    const uint8_t *FoundNext;
+    ObjectSizeMapType::iterator ObjectSizeIter;
+
+    // Construct a map of Unreal object sizes using the AutoInitialize instrinsic stubs.
+    // UStruct__AutoInit proc near
+    // .text:7FF7F0277820 45 33 C9              xor     r9d, r9d
+    // .text:7FF7F0277823 48 8D 15 AE CF 19 04  lea     rdx, aUstruct       ; "UStruct"
+    // .text:7FF7F027782A 41 B8 E0 00 00 00     mov     r8d, 0E0h
+    // .text:7FF7F0277830 48 8D 0D 39 A6 99 05  lea     rcx, off_7FF7F5C11E70
+    // .text:7FF7F0277837 E9 44 08 6E 01        jmp     sub_7FF7F1958080
+    // UStruct__AutoInit endp
+    // 45 33 C9 48 8D 15 ? ? ? ? 41 B8 ? ? ? ? 48 8D 0D ? ? ? ? E9 ? ? ? ?
+    FoundNext = static_cast<uint8_t*>(ImageBase);
+    while (1) {
+
+        // Set the search base and size for this iteration.
+        SearchBase = const_cast<uint8_t*>(FoundNext) + 1;
+        SearchSize = static_cast<size_t>(SearchEnd - SearchBase);
+        // Do the pattern scan for the next match.
+        FoundNext = utils::FindPatternIDA(SearchBase,
+                                          SearchSize,
+                                          _XOR_("45 33 C9 48 8D 15 ?? ?? ?? ?? 41 B8"));
+        if (!FoundNext) {
+            break;
+        }
+
+        // Seek to the LEA instruction that passes the Unreal object name.
+        FoundNext += 3;
+        // Get the name of the Unreal object from the address passed into RDX.
+        std::wstring ObjectName = static_cast<wchar_t*>(utils::GetInstructionTarget(FoundNext, 3));
+
+        // Seek to the MOV instruction that passes the Unreal object size.
+        FoundNext += 7;
+        // Get the Unreal object size from the instruction immediate operand.
+        size_t ObjectSize = static_cast<size_t>(utils::GetInstructionImm32(FoundNext, 2));
+
+        // Insert this Unreal object size into the map.
+        ObjectSizeMap[ObjectName] = ObjectSize;
+    }
+
+    // The second variation that uses an LEA instruction with the size.
+    // .text:7FF7F02777C0                       UField__AutoInit proc near
+    // .text:7FF7F02777C0 45 33 C9              xor     r9d, r9d
+    // .text:7FF7F02777C3 48 8D 15 5E FA 19 04  lea     rdx, aUfield        ; "UField"
+    // .text:7FF7F02777CA 48 8D 0D 77 A6 99 05  lea     rcx, off_7FF7F5C11E48
+    // .text:7FF7F02777D1 45 8D 41 38           lea     r8d, [r9+38h]
+    // .text:7FF7F02777D5 E9 A6 08 6E 01        jmp     sub_7FF7F1958080
+    // .text:7FF7F02777D5                       UField__AutoInit endp
+    // 45 33 C9 48 8D 15 ? ? ? ? 48 8D 0D ? ? ? ? 45 8D 41 ? E9 ? ? ? ?
+    FoundNext = static_cast<uint8_t*>(ImageBase);
+    while (1) {
+
+        // Set the search base and size for this iteration.
+        SearchBase = const_cast<uint8_t*>(FoundNext) + 1;
+        SearchSize = static_cast<size_t>(SearchEnd - SearchBase);
+        // Do the pattern scan for the next match.
+        FoundNext = utils::FindPatternIDA(SearchBase,
+                                          SearchSize,
+                                          _XOR_("45 33 C9 48 8D 15 ?? ?? ?? ?? 48 8D 0D"));
+        if (!FoundNext) {
+            break;
+        }
+
+        // Seek to the LEA instruction that passes the Unreal object name.
+        FoundNext += 3;
+        // Get the name of the Unreal object from the address passed into RDX.
+        std::wstring ObjectName = static_cast<wchar_t*>(utils::GetInstructionTarget(FoundNext, 3));
+
+        // Seek to the LEA instruction that passes the Unreal object size.
+        FoundNext += 14;
+        // Get the Unreal object size from the instruction memory operand.
+        size_t ObjectSize = static_cast<size_t>(utils::GetInstructionImm8(FoundNext, 3));
+
+        // Insert this Unreal object size into the map.
+        ObjectSizeMap[ObjectName] = ObjectSize;
+    }
+
+    // The third variation that UObject uses, which looks like this:
+    // .text:7FF7F0370B80                       UObject__AutoInit proc near
+    // .text:7FF7F0370B80 48 83 EC 28           sub     rsp, 28h
+    // .text:7FF7F0370B84 41 B9 B7 75 77 A1     mov     r9d, 0A17775B7h
+    // .text:7FF7F0370B8A 41 B8 30 00 00 00     mov     r8d, 30h ; '0'
+    // .text:7FF7F0370B90 48 8D 15 99 8C A2 04  lea     rdx, aUobject_0     ; "UObject"
+    // .text:7FF7F0370B97 48 8D 0D EA 24 F8 05  lea     rcx, off_7FF7F62F3088
+    // .text:7FF7F0370B9E E8 DD AC 81 02        call    sub_7FF7F2B8B880
+    // .text:7FF7F0370BA3 48 83 C4 28           add     rsp, 28h
+    // .text:7FF7F0370BA7 C3                    retn
+    // .text:7FF7F0370BA7                       UObject__AutoInit endp
+    // 48 83 EC 28 41 B9 ? ? ? ? 41 B8 ? ? ? ? 48 8D 15 ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ?
+    FoundNext = static_cast<uint8_t*>(ImageBase);
+    while (1) {
+
+        // Set the search base and size for this iteration.
+        SearchBase = const_cast<uint8_t*>(FoundNext) + 1;
+        SearchSize = static_cast<size_t>(SearchEnd - SearchBase);
+        // Do the pattern scan for the next match.
+        FoundNext = utils::FindPatternIDA(
+                            SearchBase,
+                            SearchSize,
+                            _XOR_("48 83 EC 28 41 B9 ?? ?? ?? ?? 41 B8 ?? ?? ?? ?? 48 8D 15"));
+        if (!FoundNext) {
+            break;
+        }
+
+        // Seek to the MOV instruction that passes the Unreal object size.
+        FoundNext += 10;
+        // Get the Unreal object size from the instruction immediate operand.
+        size_t ObjectSize = static_cast<size_t>(utils::GetInstructionImm32(FoundNext, 2));
+
+        // Seek to the LEA instruction that passes the Unreal object name.
+        FoundNext += 6;
+        // Get the name of the Unreal object from the address passed into RDX.
+        std::wstring ObjectName = static_cast<wchar_t*>(utils::GetInstructionTarget(FoundNext, 3));
+
+        // Insert this Unreal object size into the map.
+        ObjectSizeMap[ObjectName] = ObjectSize;
+    }
+
+    return NOERROR;
+}
+
+const size_t GetObjectSize(const std::wstring& ObjectName)
+{
+    if (!(ObjectSizeMap.empty() && InitializeUnrealObjectSizeMap() != NOERROR)) {
+        const auto it = ObjectSizeMap.find(ObjectName);
+        if (it != std::end(ObjectSizeMap)) {
+            return it->second;
+        }
+    }
+    return 0;
+}
+
 
 /**
  * Objects offsets and inline decryption globals.
  */
-static size_t ObjectsEncryptedOffset = -1;
-static int8_t ObjectsEncryptedRegister = -1;
-static uint8_t* ObjectsDecryptionBegin = nullptr;
-static uint8_t* ObjectsDecryptionEnd = nullptr;
+size_t ObjectsEncryptedOffset = -1;
+int8_t ObjectsEncryptedRegister = -1;
+uint8_t* ObjectsDecryptionBegin = nullptr;
+uint8_t* ObjectsDecryptionEnd = nullptr;
 
-static size_t ObjectFlagsEncryptedOffset = -1;
-static int8_t ObjectFlagsEncryptedRegister = -1;
-static uint8_t* ObjectFlagsDecryptionBegin = nullptr;
-static uint8_t* ObjectFlagsDecryptionEnd = nullptr;
+size_t ObjectFlagsEncryptedOffset = -1;
+int8_t ObjectFlagsEncryptedRegister = -1;
+uint8_t* ObjectFlagsDecryptionBegin = nullptr;
+uint8_t* ObjectFlagsDecryptionEnd = nullptr;
 
-static size_t ObjectOuterEncryptedOffset = -1;
-static int8_t ObjectOuterEncryptedRegister = -1;
-static uint8_t* ObjectOuterDecryptionBegin = nullptr;
-static uint8_t* ObjectOuterDecryptionEnd = nullptr;
+size_t ObjectOuterEncryptedOffset = -1;
+int8_t ObjectOuterEncryptedRegister = -1;
+uint8_t* ObjectOuterDecryptionBegin = nullptr;
+uint8_t* ObjectOuterDecryptionEnd = nullptr;
 
-static size_t ObjectInternalIndexEncryptedOffset = -1;
-static int8_t ObjectInternalIndexEncryptedRegister = -1;
-static uint8_t* ObjectInternalIndexDecryptionBegin = nullptr;
-static uint8_t* ObjectInternalIndexDecryptionEnd = nullptr;
+size_t ObjectInternalIndexEncryptedOffset = -1;
+int8_t ObjectInternalIndexEncryptedRegister = -1;
+uint8_t* ObjectInternalIndexDecryptionBegin = nullptr;
+uint8_t* ObjectInternalIndexDecryptionEnd = nullptr;
 
-static size_t ObjectClassEncryptedOffset = -1;
-static int8_t ObjectClassEncryptedRegister = -1;
-static uint8_t* ObjectClassDecryptionBegin = nullptr;
-static uint8_t* ObjectClassDecryptionEnd = nullptr;
+size_t ObjectClassEncryptedOffset = -1;
+int8_t ObjectClassEncryptedRegister = -1;
+uint8_t* ObjectClassDecryptionBegin = nullptr;
+uint8_t* ObjectClassDecryptionEnd = nullptr;
 
-static size_t ObjectNameIndexEncryptedOffset = -1;
-static int8_t ObjectNameIndexEncryptedRegister = -1;
-static size_t ObjectNameNumberEncryptedOffset = -1;
-static int8_t ObjectNameNumberEncryptedRegister = -1;
-static uint8_t* ObjectNameDecryptionBegin = nullptr;
-static uint8_t* ObjectNameDecryptionEnd = nullptr;
+size_t ObjectNameIndexEncryptedOffset = -1;
+int8_t ObjectNameIndexEncryptedRegister = -1;
+size_t ObjectNameNumberEncryptedOffset = -1;
+int8_t ObjectNameNumberEncryptedRegister = -1;
+uint8_t* ObjectNameDecryptionBegin = nullptr;
+uint8_t* ObjectNameDecryptionEnd = nullptr;
 
-static size_t StructPropertiesSizeOffset = -1;
-static size_t StructMinAlignmentOffset = -1;
-static size_t StructChildrenOffset = -1;
-static size_t StructSuperStructOffset = -1;
+size_t StructPropertiesSizeOffset = -1;
+size_t StructMinAlignmentOffset = -1;
+size_t StructChildrenOffset = -1;
+size_t StructSuperStructOffset = -1;
 
-static size_t FunctionFlagsOffset = -1;
+size_t FunctionFlagsOffset = -1;
 
-static size_t PropertyElementSizeOffset = -1;
-static size_t PropertyArrayDimOffset = -1;
-static size_t PropertyOffset_InternalOffset = -1;
-static size_t PropertyFlagsOffset = -1;
+size_t PropertyElementSizeOffset = -1;
+size_t PropertyArrayDimOffset = -1;
+size_t PropertyOffsetInternalOffset = -1;
+size_t PropertyFlagsOffset = -1;
 
-static size_t EnumNamesOffset = -1;
-static size_t EnumCppFormOffset = -1;
+size_t EnumNamesOffset = -1;
+size_t EnumCppFormOffset = -1;
 
 int DumpObjects()
 {
@@ -512,7 +655,6 @@ int DumpObjects()
     }
 
 
-
     // Signature inside of ObjectBaseUtility::GetFullName to get the
     // ClassEncrypted and NameEncrypted fields of UObject.
     // BA 80 00 00 00 E8 ? ? ? ? 48 8B 7D ?
@@ -686,7 +828,6 @@ int DumpObjects()
         }
         LOG_INFO(_XOR_("}; "));
     }
-
 
 
     // Search for the following sequence inside of UStruct::Link:
@@ -903,7 +1044,7 @@ int DumpObjects()
 
         PropertyElementSizeOffset = Insts[0].disp;
         PropertyArrayDimOffset = Insts[1].disp;
-        PropertyOffset_InternalOffset = Insts[2].disp;
+        PropertyOffsetInternalOffset = Insts[2].disp;
 
     } else {
         LOG_ERROR(_XOR_("Failed to find UProperty offsets inside UProperty::SetupOffset!"));
@@ -947,8 +1088,8 @@ int DumpObjects()
     if (PropertyArrayDimOffset != -1) {
         LOG_INFO(_XOR_("UProperty::ArrayDim offset = 0x%08x"), PropertyArrayDimOffset);
     }
-    if (PropertyOffset_InternalOffset != -1) {
-        LOG_INFO(_XOR_("UProperty::Offset_Internal offset = 0x%08x"), PropertyOffset_InternalOffset);
+    if (PropertyOffsetInternalOffset != -1) {
+        LOG_INFO(_XOR_("UProperty::Offset_Internal offset = 0x%08x"), PropertyOffsetInternalOffset);
     }
     if (PropertyFlagsOffset != -1) {
         LOG_INFO(_XOR_("UProperty::PropertyFlags offset = 0x%08x"), PropertyFlagsOffset);
@@ -1031,196 +1172,38 @@ int DumpObjects()
     }
 
 
-
-
     return rc;
 }
 
-typedef std::map<std::wstring, size_t> UnrealObjectSizeMapType;
-UnrealObjectSizeMapType UnrealObjectSizeMap;
-
-static int InitializeUnrealObjectSizeMap()
+int32_t GenerateStructString(_Out_ std::string* OutString,
+                             _In_ std::wstring Name,
+                             _In_opt_ std::vector<std::wstring>* InheritedStructs,
+                             _In_opt_ FieldMapType* FieldMap)
 {
-    void* ImageBase = utils::GetModuleHandleWIDE(nullptr /*0xC4D8736D TslGame.exe */);
-    uint32_t ImageSize = utils::GetModuleSize((HMODULE)ImageBase);
-    const uint8_t* SearchEnd = static_cast<uint8_t*>(ImageBase) + ImageSize;
-    uint8_t* SearchBase;
-    size_t SearchSize;
-    const uint8_t *FoundNext;
-    UnrealObjectSizeMapType::iterator UnrealObjectSizeIter;
-
-    // Construct a map of Unreal object sizes using the AutoInitialize instrinsic stubs.
-    // UStruct__AutoInit proc near
-    // .text:7FF7F0277820 45 33 C9              xor     r9d, r9d
-    // .text:7FF7F0277823 48 8D 15 AE CF 19 04  lea     rdx, aUstruct       ; "UStruct"
-    // .text:7FF7F027782A 41 B8 E0 00 00 00     mov     r8d, 0E0h
-    // .text:7FF7F0277830 48 8D 0D 39 A6 99 05  lea     rcx, off_7FF7F5C11E70
-    // .text:7FF7F0277837 E9 44 08 6E 01        jmp     sub_7FF7F1958080
-    // UStruct__AutoInit endp
-    // 45 33 C9 48 8D 15 ? ? ? ? 41 B8 ? ? ? ? 48 8D 0D ? ? ? ? E9 ? ? ? ?
-    FoundNext = static_cast<uint8_t*>(ImageBase);
-    while (1) {
-
-        // Set the search base and size for this iteration.
-        SearchBase = const_cast<uint8_t*>(FoundNext) + 1;
-        SearchSize = static_cast<size_t>(SearchEnd - SearchBase);
-        // Do the pattern scan for the next match.
-        FoundNext = utils::FindPatternIDA(SearchBase,
-                                          SearchSize,
-                                          _XOR_("45 33 C9 48 8D 15 ?? ?? ?? ?? 41 B8"));
-        if (!FoundNext) {
-            break;
-        }
-
-        // Seek to the LEA instruction that passes the Unreal object name.
-        FoundNext += 3;
-        // Get the name of the Unreal object from the address passed into RDX.
-        std::wstring ObjectName = static_cast<wchar_t*>(utils::GetInstructionTarget(FoundNext, 3));
-
-        // Seek to the MOV instruction that passes the Unreal object size.
-        FoundNext += 7;
-        // Get the Unreal object size from the instruction immediate operand.
-        size_t ObjectSize = static_cast<size_t>(utils::GetInstructionImm32(FoundNext, 2));
-
-        // Insert this Unreal object size into the map.
-        UnrealObjectSizeMap[ObjectName] = ObjectSize;
-    }
-
-    // The second variation that uses an LEA instruction with the size.
-    // .text:7FF7F02777C0                       UField__AutoInit proc near
-    // .text:7FF7F02777C0 45 33 C9              xor     r9d, r9d
-    // .text:7FF7F02777C3 48 8D 15 5E FA 19 04  lea     rdx, aUfield        ; "UField"
-    // .text:7FF7F02777CA 48 8D 0D 77 A6 99 05  lea     rcx, off_7FF7F5C11E48
-    // .text:7FF7F02777D1 45 8D 41 38           lea     r8d, [r9+38h]
-    // .text:7FF7F02777D5 E9 A6 08 6E 01        jmp     sub_7FF7F1958080
-    // .text:7FF7F02777D5                       UField__AutoInit endp
-    // 45 33 C9 48 8D 15 ? ? ? ? 48 8D 0D ? ? ? ? 45 8D 41 ? E9 ? ? ? ?
-    FoundNext = static_cast<uint8_t*>(ImageBase);
-    while (1) {
-
-        // Set the search base and size for this iteration.
-        SearchBase = const_cast<uint8_t*>(FoundNext) + 1;
-        SearchSize = static_cast<size_t>(SearchEnd - SearchBase);
-        // Do the pattern scan for the next match.
-        FoundNext = utils::FindPatternIDA(SearchBase,
-                                          SearchSize,
-                                          _XOR_("45 33 C9 48 8D 15 ?? ?? ?? ?? 48 8D 0D"));
-        if (!FoundNext) {
-            break;
-        }
-
-        // Seek to the LEA instruction that passes the Unreal object name.
-        FoundNext += 3;
-        // Get the name of the Unreal object from the address passed into RDX.
-        std::wstring ObjectName = static_cast<wchar_t*>(utils::GetInstructionTarget(FoundNext, 3));
-
-        // Seek to the LEA instruction that passes the Unreal object size.
-        FoundNext += 14;
-        // Get the Unreal object size from the instruction memory operand.
-        size_t ObjectSize = static_cast<size_t>(utils::GetInstructionImm8(FoundNext, 3));
-
-        // Insert this Unreal object size into the map.
-        UnrealObjectSizeMap[ObjectName] = ObjectSize;
-    }
-
-    // The third variation that UObject uses, which looks like this:
-    // .text:7FF7F0370B80                       UObject__AutoInit proc near
-    // .text:7FF7F0370B80 48 83 EC 28           sub     rsp, 28h
-    // .text:7FF7F0370B84 41 B9 B7 75 77 A1     mov     r9d, 0A17775B7h
-    // .text:7FF7F0370B8A 41 B8 30 00 00 00     mov     r8d, 30h ; '0'
-    // .text:7FF7F0370B90 48 8D 15 99 8C A2 04  lea     rdx, aUobject_0     ; "UObject"
-    // .text:7FF7F0370B97 48 8D 0D EA 24 F8 05  lea     rcx, off_7FF7F62F3088
-    // .text:7FF7F0370B9E E8 DD AC 81 02        call    sub_7FF7F2B8B880
-    // .text:7FF7F0370BA3 48 83 C4 28           add     rsp, 28h
-    // .text:7FF7F0370BA7 C3                    retn
-    // .text:7FF7F0370BA7                       UObject__AutoInit endp
-    // 48 83 EC 28 41 B9 ? ? ? ? 41 B8 ? ? ? ? 48 8D 15 ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ?
-    FoundNext = static_cast<uint8_t*>(ImageBase);
-    while (1) {
-
-        // Set the search base and size for this iteration.
-        SearchBase = const_cast<uint8_t*>(FoundNext) + 1;
-        SearchSize = static_cast<size_t>(SearchEnd - SearchBase);
-        // Do the pattern scan for the next match.
-        FoundNext = utils::FindPatternIDA(
-                            SearchBase,
-                            SearchSize,
-                            _XOR_("48 83 EC 28 41 B9 ?? ?? ?? ?? 41 B8 ?? ?? ?? ?? 48 8D 15"));
-        if (!FoundNext) {
-            break;
-        }
-
-        // Seek to the MOV instruction that passes the Unreal object size.
-        FoundNext += 10;
-        // Get the Unreal object size from the instruction immediate operand.
-        size_t ObjectSize = static_cast<size_t>(utils::GetInstructionImm32(FoundNext, 2));
-
-        // Seek to the LEA instruction that passes the Unreal object name.
-        FoundNext += 6;
-        // Get the name of the Unreal object from the address passed into RDX.
-        std::wstring ObjectName = static_cast<wchar_t*>(utils::GetInstructionTarget(FoundNext, 3));
-
-        // Insert this Unreal object size into the map.
-        UnrealObjectSizeMap[ObjectName] = ObjectSize;
-    }
-
-
-    return NOERROR;
-}
-
-struct FieldMapEntry {
-    FieldMapEntry() : Size(0) { memset(Name, 0, sizeof(Name) + sizeof(TypeName)); }
-
-    FieldMapEntry(const char* InName, const char *InTypeName, size_t InSize) : Size(InSize)
-    {
-        strncpy_s(Name, InName, sizeof(Name));
-        strncpy_s(TypeName, InTypeName, sizeof(TypeName));
-    }
-
-    FieldMapEntry& operator=(const FieldMapEntry& Other)
-    {
-        strncpy_s(Name, Other.Name, sizeof(Name));
-        strncpy_s(TypeName, Other.TypeName, sizeof(TypeName));
-        Size = Other.Size;
-        return *this;
-    }
-
-    char Name[256];
-    char TypeName[256];
-    size_t Size;
-};
-
-#define FIELD_MAP_ENTRY(Name, Type) \
-    FieldMapEntry(_XOR_(Name), _XOR_(#Type), sizeof(Type))
-
-typedef std::map<size_t, FieldMapEntry> FieldMapType;
-
-int32_t DumpStruct(std::wstring Name,
-                   std::vector<std::wstring>* InheritedStructs,
-                   std::map<size_t, FieldMapEntry>* FieldMap,
-                   size_t StartOffset = 0,
-                   size_t StartSize = 0)
-{
-    size_t Offset = StartOffset;
-    size_t Size = StartSize;
+    size_t Offset = 0;
+    size_t Size = 0;
     size_t StructSize = 0;
-    UnrealObjectSizeMapType::iterator SizeIter;
+    ObjectSizeMapType::iterator SizeIter;
     FieldMapType::iterator FieldIter;
+
+    std::ostringstream oss;
+
+    std::string NameString = utils::wstring_to_string(Name);
 
     if (!InheritedStructs) {
 
-        LOG_INFO(_XOR_("class %ws {"), Name.c_str());
+        oss << _XORSTR_("class ") << NameString << _XORSTR_(" {\n");
 
     } else {
 
         std::vector<std::wstring>::iterator InheritedStructIter = InheritedStructs->begin();
 
         // Add the first inherited struct to the inherit string.
-        std::wstring InheritString = _XORSTR_(L": public ") + *InheritedStructIter;
+        std::wstring InheritList = _XORSTR_(L": public ") + *InheritedStructIter;
 
         // Adjust the offset.
-        SizeIter = UnrealObjectSizeMap.find(*InheritedStructIter);
-        if (SizeIter != UnrealObjectSizeMap.end()) {
+        SizeIter = ObjectSizeMap.find(*InheritedStructIter);
+        if (SizeIter != ObjectSizeMap.end()) {
             Offset += SizeIter->second;
         } else {
             LOG_ERROR(_XOR_("COULD NOT FIND INHERITED STRUCT \"%ws\" SIZE!"),
@@ -1233,11 +1216,11 @@ int32_t DumpStruct(std::wstring Name,
         // Iterate through the remaining inherited structs.
         while (InheritedStructIter != InheritedStructs->end()) {
             // Add inherited struct name to the inherit string.
-            InheritString += _XORSTR_(L", public ") + *InheritedStructIter;
+            InheritList += _XORSTR_(L", public ") + *InheritedStructIter;
 
             // Adjust the offset.
-            SizeIter = UnrealObjectSizeMap.find(*InheritedStructIter);
-            if (SizeIter != UnrealObjectSizeMap.end()) {
+            SizeIter = ObjectSizeMap.find(*InheritedStructIter);
+            if (SizeIter != ObjectSizeMap.end()) {
                 Offset += SizeIter->second;
             } else {
                 LOG_ERROR(_XOR_("COULD NOT FIND INHERITED STRUCT \"%ws\" SIZE!"),
@@ -1248,9 +1231,11 @@ int32_t DumpStruct(std::wstring Name,
             // Iterate to the next inherited struct.
             ++InheritedStructIter;
         }
-        LOG_INFO(_XOR_("class %ws %ws {"), Name.c_str(), InheritString.c_str());
+
+        oss << _XORSTR_("class ") << NameString << ' ' <<
+            utils::wstring_to_string(InheritList) << _XORSTR_(" {\n");
     }
-    LOG_INFO(_XOR_("public:"));
+    oss << _XORSTR_("public:\n");
 
     if (FieldMap) {
 
@@ -1269,12 +1254,13 @@ int32_t DumpStruct(std::wstring Name,
             // Dump padding field to fill in space, if needed.
             if (LastOffset + LastSize < Offset) {
                 size_t PaddingSize = Offset - (LastOffset + LastSize);
-                LOG_INFO(_XOR_("    uint8_t UnknownData0x%04X[0x%X]; // 0x%04X (size=0x%04X)"),
-                         LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
+                oss << tfm::format(_XOR_("    uint8_t UnknownData0x%04X[0x%X]; // 0x%04X (size=0x%04X)\n"),
+                                   LastOffset + LastSize, PaddingSize, LastOffset + LastSize, PaddingSize);
             }
 
             // Dump the field.
-            LOG_INFO(_XOR_("    %s %s; // 0x%04X (size=0x%04X)"), Entry.TypeName, Entry.Name, Offset, Size);
+            oss << tfm::format(_XOR_("    %s %s; // 0x%04X (size=0x%04X)\n"),
+                               Entry.TypeName, Entry.Name, Offset, Size);
 
             // Iterate to the next field.
             ++FieldIter;
@@ -1282,26 +1268,28 @@ int32_t DumpStruct(std::wstring Name,
     } 
 
     // Dump the struct size.
-    SizeIter = UnrealObjectSizeMap.find(Name);
-    if (SizeIter != UnrealObjectSizeMap.end()) {
+    SizeIter = ObjectSizeMap.find(Name);
+    if (SizeIter != ObjectSizeMap.end()) {
 
         StructSize = SizeIter->second;
         if (StructSize > Offset + Size) {
             size_t PaddingSize = StructSize - (Offset + Size);
-            LOG_INFO(_XOR_("    uint8_t UnknownData0x%04X[0x%X]; // 0x%04X (size=0x%04X)"),
-                     Offset + Size, PaddingSize, Offset + Size, PaddingSize);
+            oss << tfm::format(_XOR_("    uint8_t UnknownData0x%04X[0x%X]; // 0x%04X (size=0x%04X)\n"),
+                               Offset + Size, PaddingSize, Offset + Size, PaddingSize);
         }
-
-        LOG_INFO(_XOR_("}; // size=0x%04X"), StructSize, Offset + Size);
+        oss << tfm::format(_XOR_("}; // size=0x%04X\n"), StructSize);
 
     } else {
 
         StructSize = Offset + Size;
-        LOG_INFO(_XOR_("}; // guessed size=0x%04X"), Offset + Size);
+        oss << tfm::format(_XOR_("}; // guessed size=0x%04X"), StructSize);
     }
 
     // Dump a C_ASSERT for verification or struct size.
-    LOG_INFO(_XOR_("C_ASSERT(sizeof(%ws) == 0x%X);\n"), Name.c_str(), StructSize);
+    oss << tfm::format(_XOR_("C_ASSERT(sizeof(%s) == 0x%X);\n"), NameString.c_str(), StructSize);
+
+    // Return resulting output string.
+    *OutString = oss.str();
 
     // Return struct size, indicating success.
     return static_cast<int32_t>(StructSize);
@@ -1312,7 +1300,7 @@ int DumpStructs()
     int rc;
     size_t Offset;
     FieldMapType::iterator FieldIter;
-    UnrealObjectSizeMapType::iterator SizeIter;
+    ObjectSizeMapType::iterator SizeIter;
     size_t UObjectSize, UFieldSize, UStructSize, UFunctionSize, UPropertySize, UEnumSize;
 
     // Get the needed Unreal object struct sizes.
@@ -1334,7 +1322,8 @@ int DumpStructs()
     // Dump the UObject fields.
     //
     Offset = 0;
-    std::map<size_t, FieldMapEntry> UObjectFieldMap;
+    std::string UObjectOutput;
+    FieldMapType UObjectFieldMap;
     UObjectFieldMap[Offset] = FIELD_MAP_ENTRY("VTable", void**);
     UObjectFieldMap[ObjectFlagsEncryptedOffset] = FIELD_MAP_ENTRY("ObjectFlagsEncrypted", int32_t);
     UObjectFieldMap[ObjectOuterEncryptedOffset] = FIELD_MAP_ENTRY("OuterEncrypted", uint64_t);
@@ -1342,89 +1331,110 @@ int DumpStructs()
     UObjectFieldMap[ObjectClassEncryptedOffset] = FIELD_MAP_ENTRY("ClassEncrypted", uint64_t);
     UObjectFieldMap[ObjectNameIndexEncryptedOffset] = FIELD_MAP_ENTRY("NameIndexEncrypted", int32_t);
     UObjectFieldMap[ObjectNameNumberEncryptedOffset] = FIELD_MAP_ENTRY("NameNumberEncrypted", int32_t);
-    UObjectSize = DumpStruct(_XORSTR_(L"UObject"), nullptr, &UObjectFieldMap);
+    UObjectSize = GenerateStructString(&UObjectOutput, _XORSTR_(L"UObject"), nullptr, &UObjectFieldMap);
     if (UObjectSize <= 0) {
         LOG_ERROR(_XOR_("Failed to dump UObject rc %d"), rc);
         return rc < 0 ? rc : E_FAIL;
+    }
+    for (auto line : utils::SplitString(UObjectOutput, '\n')) {
+        LOG_INFO("%s", line.c_str());
     }
 
     //
     // Dump the UField fields.
     //
     Offset = UObjectSize;
-    std::map<size_t, FieldMapEntry> UFieldFieldMap;
+    std::string UFieldOutput;
+    FieldMapType UFieldFieldMap;
     UFieldFieldMap[Offset] = FieldMapEntry(_XOR_("Next"), _XOR_("UField*"), sizeof(void*));
     std::vector<std::wstring> UFieldInherited;
     UFieldInherited.push_back(_XORSTR_(L"UObject"));
-    UFieldSize = DumpStruct(_XORSTR_(L"UField"), &UFieldInherited, &UFieldFieldMap);
+    UFieldSize = GenerateStructString(&UFieldOutput, _XORSTR_(L"UField"), &UFieldInherited, &UFieldFieldMap);
     if (UFieldSize <= 0) {
         LOG_ERROR(_XOR_("Failed to dump UField rc %d"), rc);
         return rc < 0 ? rc : E_FAIL;
+    }
+    for (auto line : utils::SplitString(UFieldOutput, '\n')) {
+        LOG_INFO("%s", line.c_str());
     }
 
     //
     // Dump the UStruct fields.
     //
     Offset = UFieldSize;
-    std::map<size_t, FieldMapEntry> UStructFieldMap;
+    std::string UStructOutput;
+    FieldMapType UStructFieldMap;
     UStructFieldMap[StructPropertiesSizeOffset] = FIELD_MAP_ENTRY("PropertiesSize", int32_t);
     UStructFieldMap[StructMinAlignmentOffset] = FIELD_MAP_ENTRY("MinAlignment", int32_t);
     UStructFieldMap[StructChildrenOffset] = FieldMapEntry("Children", "UField*", sizeof(void*));
     UStructFieldMap[StructSuperStructOffset] = FieldMapEntry("SuperStruct", "class UStruct*", sizeof(void*));
     std::vector<std::wstring> UStructInherited;
     UStructInherited.push_back(_XORSTR_(L"UField"));
-    UStructSize = DumpStruct(_XORSTR_(L"UStruct"), &UStructInherited, &UStructFieldMap);
+    UStructSize = GenerateStructString(&UStructOutput, _XORSTR_(L"UStruct"), &UStructInherited, &UStructFieldMap);
     if (UStructSize <= 0) {
         LOG_ERROR(_XOR_("Failed to dump UStruct rc %d"), rc);
         return rc < 0 ? rc : E_FAIL;
     }
-
+    for (auto line : utils::SplitString(UStructOutput, '\n')) {
+        LOG_INFO("%s", line.c_str());
+    }
 
     //
     // Dump the UFunction fields.
     //
     Offset = UStructSize;
-    std::map<size_t, FieldMapEntry> UFunctionFieldMap;
+    std::string UFunctionOutput;
+    FieldMapType UFunctionFieldMap;
     UFunctionFieldMap[FunctionFlagsOffset] = FIELD_MAP_ENTRY("FunctionFlags", uint32_t);
     std::vector<std::wstring> UFunctionInherited;
     UFunctionInherited.push_back(_XORSTR_(L"UStruct"));
-    UFunctionSize = DumpStruct(_XORSTR_(L"UFunction"), &UFunctionInherited, &UFunctionFieldMap);
+    UFunctionSize = GenerateStructString(&UFunctionOutput, _XORSTR_(L"UFunction"), &UFunctionInherited, &UFunctionFieldMap);
     if (UFunctionSize <= 0) {
         LOG_ERROR(_XOR_("Failed to dump UFunction rc %d"), rc);
         return rc < 0 ? rc : E_FAIL;
     }
-
+    for (auto line : utils::SplitString(UFunctionOutput, '\n')) {
+        LOG_INFO("%s", line.c_str());
+    }
 
     //
     // Dump the UProperty fields.
     //
     Offset = UFieldSize;
-    std::map<size_t, FieldMapEntry> UPropertyFieldMap;
+    std::string UPropertyOutput;
+    FieldMapType UPropertyFieldMap;
     UPropertyFieldMap[PropertyElementSizeOffset] = FIELD_MAP_ENTRY("ElementSize", int32_t);
     UPropertyFieldMap[PropertyArrayDimOffset] = FIELD_MAP_ENTRY("ArrayDim", int32_t);
-    UPropertyFieldMap[PropertyOffset_InternalOffset] = FIELD_MAP_ENTRY("Offset_Internal", int32_t);
+    UPropertyFieldMap[PropertyOffsetInternalOffset] = FIELD_MAP_ENTRY("Offset_Internal", int32_t);
     UPropertyFieldMap[PropertyFlagsOffset] = FIELD_MAP_ENTRY("PropertyFlags", uint64_t);
     std::vector<std::wstring> UPropertyInherited;
     UPropertyInherited.push_back(_XORSTR_(L"UField"));
-    UPropertySize = DumpStruct(_XORSTR_(L"UProperty"), &UPropertyInherited, &UPropertyFieldMap);
+    UPropertySize = GenerateStructString(&UPropertyOutput, _XORSTR_(L"UProperty"), &UPropertyInherited, &UPropertyFieldMap);
     if (UPropertySize <= 0) {
         LOG_ERROR(_XOR_("Failed to dump UProperty rc %d"), rc);
         return rc < 0 ? rc : E_FAIL;
+    }
+    for (auto line : utils::SplitString(UPropertyOutput, '\n')) {
+        LOG_INFO("%s", line.c_str());
     }
 
 
     //
     // Dump the UEnum fields.
     //
-    std::map<size_t, FieldMapEntry> UEnumFieldMap;
+    std::string UEnumOutput;
+    FieldMapType UEnumFieldMap;
     UEnumFieldMap[EnumNamesOffset] = FieldMapEntry(_XOR_("Names"), _XOR_("TArray<TPair<FName, int64_t>>"), 16);
     UEnumFieldMap[EnumCppFormOffset] = FIELD_MAP_ENTRY("CppForm", int32_t);
     std::vector<std::wstring> UEnumInherited;
     UEnumInherited.push_back(_XORSTR_(L"UField"));
-    UEnumSize = DumpStruct(_XORSTR_(L"UEnum"), &UEnumInherited, &UEnumFieldMap);
+    UEnumSize = GenerateStructString(&UEnumOutput, _XORSTR_(L"UEnum"), &UEnumInherited, &UEnumFieldMap);
     if (UEnumSize <= 0) {
         LOG_ERROR(_XOR_("Failed to dump UEnum rc %d"), rc);
         return rc < 0 ? rc : E_FAIL;
+    }
+    for(auto line : utils::SplitString(UEnumOutput, '\n')) {
+        LOG_INFO("%s", line.c_str());
     }
 
     return NOERROR;
@@ -1437,29 +1447,29 @@ int DumpStructs()
 /**
  * Names offsets and inline decryption globals.
  */
-static int8_t NamesHashEntryRegister = -1;
-static size_t NamesEntryHashNextOffset = -1;
-static size_t NamesEntryIndexEncryptedOffset = -1;
-static int8_t NamesEntryIndexEncryptedRegister = -1;
-static uint8_t* NamesEntryIndexDecryptionBegin = nullptr;
-static uint8_t* NamesEntryIndexDecryptionEnd = nullptr;
+int8_t NamesHashEntryRegister = -1;
+size_t NamesEntryHashNextOffset = -1;
+size_t NamesEntryIndexEncryptedOffset = -1;
+int8_t NamesEntryIndexEncryptedRegister = -1;
+uint8_t* NamesEntryIndexDecryptionBegin = nullptr;
+uint8_t* NamesEntryIndexDecryptionEnd = nullptr;
 
-static uint8_t* NamesGetEncryptedNamesRoutine = nullptr;
-static int8_t NamesEncryptedRegister = -1;
-static uint8_t* NamesDecryptionBegin = nullptr;
-static uint8_t* NamesDecryptionEnd = nullptr;
+uint8_t* NamesGetEncryptedNamesRoutine = nullptr;
+int8_t NamesEncryptedRegister = -1;
+uint8_t* NamesDecryptionBegin = nullptr;
+uint8_t* NamesDecryptionEnd = nullptr;
 
-static uint8_t* NamesEntryArrayAddZeroedRoutine = nullptr;
-static size_t NamesEntryArrayElementsPerChunk = -1;
-static size_t NamesEntryArrayChunksEncryptedOffset = -1;
-static int8_t NamesEntryArrayChunksEncryptedRegister = -1;
-static uint8_t* NamesEntryArrayChunksDecryptionBegin = nullptr;
-static uint8_t* NamesEntryArrayChunksDecryptionEnd = nullptr;
+uint8_t* NamesEntryArrayAddZeroedRoutine = nullptr;
+size_t NamesEntryArrayElementsPerChunk = -1;
+size_t NamesEntryArrayChunksEncryptedOffset = -1;
+int8_t NamesEntryArrayChunksEncryptedRegister = -1;
+uint8_t* NamesEntryArrayChunksDecryptionBegin = nullptr;
+uint8_t* NamesEntryArrayChunksDecryptionEnd = nullptr;
 
-static size_t NamesEntryArrayNumElementsEncryptedOffset = -1;
-static int8_t NamesEntryArrayNumElementsEncryptedRegister = -1;
-static uint8_t* NamesEntryArrayNumElementsDecryptionBegin = nullptr;
-static uint8_t* NamesEntryArrayNumElementsDecryptionEnd = nullptr;
+size_t NamesEntryArrayNumElementsEncryptedOffset = -1;
+int8_t NamesEntryArrayNumElementsEncryptedRegister = -1;
+uint8_t* NamesEntryArrayNumElementsDecryptionBegin = nullptr;
+uint8_t* NamesEntryArrayNumElementsDecryptionEnd = nullptr;
 
 int DumpNames()
 {
@@ -1895,7 +1905,6 @@ int DumpNames()
     }
 
 
-
     // Search for the call to FArchive::operator<<(FArchive& Ar, FPropertyTag& Tag):
     // .text:7FF6FB83065F 0F B6 43 28           movzx   eax, byte ptr [rbx+28h]
     // .text:7FF6FB830663 A8 02                 test    al, 2
@@ -2060,18 +2069,15 @@ int DumpNames()
 
 
 
-
-
 /**
- * World offsets and inline decryption globals.
+ * UWorld offsets and inline decryption globals.
  */
-static size_t WorldEncryptedOffset = -1;
-static int8_t WorldEncryptedRegister = -1;
-static size_t WorldEncryptedStackOffset = -1;
-static int8_t WorldEncryptedStackRegister = -1;
-static uint8_t* WorldDecryptionBegin = nullptr;
-static uint8_t* WorldDecryptionEnd = nullptr;
-
+size_t WorldEncryptedOffset = -1;
+int8_t WorldEncryptedRegister = -1;
+size_t WorldEncryptedStackOffset = -1;
+int8_t WorldEncryptedStackRegister = -1;
+uint8_t* WorldDecryptionBegin = nullptr;
+uint8_t* WorldDecryptionEnd = nullptr;
 
 int DumpWorld()
 {
