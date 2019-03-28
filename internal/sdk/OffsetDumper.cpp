@@ -1495,6 +1495,13 @@ int DumpNames()
     }
     LOG_INFO(_XOR_("Found the FName::InitInternal_FindOrAddNameEntry signature: 0x%p"), Found);
 
+    LOG_INFO(_XOR_("FName::InitInternal_FindOrAddNameEntry instruction bytes = {"));
+    std::string bufstr = utils::FormatBuffer(Found, 1024);
+    for (auto line : utils::SplitString(bufstr, '\n')) {
+        LOG_INFO(_XOR_("%s"), line.c_str());
+    }
+    LOG_INFO(_XOR_("};"));
+
     // Disassemble the FName::InitInternal_FindOrAddNameEntry routine.
     rc = DisDecompose(Found,
                       MAX_DISASM_LENGTH,
@@ -1656,7 +1663,7 @@ int DumpNames()
             if (Inst->opcode == I_LEA &&
                 NextInst->opcode == I_CALL &&
                 NextInst[1].opcode == I_MOV &&
-                NextInst[2].opcode == I_CMP) {
+                NextInst[1].ops[1].type == O_SMEM) {
 
                 // We found the FName::GetEncryptedNames subroutine!
                 TargetAddress = INSTRUCTION_GET_TARGET(NextInst);
@@ -1670,46 +1677,41 @@ int DumpNames()
                 // Get the encrypted names register.
                 NamesEncryptedRegister = NextInst->ops[0].index;
 
-                // Skip over the next two instruction.
+                // Find the jump instruction to the FName::NamesEncrypted inline decryption.
                 INCREMENT_NEXT_INSTRUCTION();
-                INCREMENT_NEXT_INSTRUCTION();
-
+                while(META_GET_FC(NextInst->meta) != FC_CND_BRANCH) {
+                    INCREMENT_NEXT_INSTRUCTION();
+                }
                 // The jump target address is the beginning of the FName::NamesEncrypted
                 // inline decryption.
                 TargetAddress = INSTRUCTION_GET_TARGET(NextInst);
-                if (META_GET_FC(NextInst->meta) == FC_CND_BRANCH) {
 
-                    // Skip instructions in between jump and decryption.
-                    TargetAddress = INSTRUCTION_GET_TARGET(NextInst);
-                    while (NextInst->addr != TargetAddress) {
-                        INCREMENT_NEXT_INSTRUCTION();
-                    }
-                    // We found the beginning of the FName::NamesEncrypted decryption!
-                    NamesDecryptionBegin = reinterpret_cast<uint8_t *>(TargetAddress);
-                    LOG_INFO(_XOR_("Found the FName::NamesEncrypted decryption beginning: 0x%p"),
-                             NamesDecryptionBegin);
-
-                    // This should now mark the beginning of the FName::NamesEncrypted decryption.
-                    // Keep iterating next instruction until we hit the end of the decryption.
+                // Skip instructions in between jump and decryption.
+                while (NextInst->addr != TargetAddress) {
                     INCREMENT_NEXT_INSTRUCTION();
-                    // Search for the decryption terminating instruction:
-                    /* mov     rax, [rsp+120h+NamesDecrypted] */
-                    while (!(NextInst->opcode == I_MOV &&
-                             NextInst->ops[1].type == O_SMEM)) {
-                        INCREMENT_NEXT_INSTRUCTION();
-                    }
-                    INCREMENT_NEXT_INSTRUCTION();
-                    // We found the end of the FName::NamesEncryptedinline decryption!
-                    NamesDecryptionEnd = NextIp;
-                    LOG_INFO(_XOR_("Found the FName::NamesEncrypted decryption ending: 0x%p"),
-                             NamesDecryptionEnd);
-
-                    // Increment to the next instruction.
-                    INCREMENT_NEXT_INSTRUCTION();
-
-                } else {
-                    LOG_ERROR(_XOR_("FName::NamesEncrypted decryption heuristic failed!"));
                 }
+                // We found the beginning of the FName::NamesEncrypted decryption!
+                NamesDecryptionBegin = reinterpret_cast<uint8_t *>(TargetAddress);
+                LOG_INFO(_XOR_("Found the FName::NamesEncrypted decryption beginning: 0x%p"),
+                         NamesDecryptionBegin);
+
+                // This should now mark the beginning of the FName::NamesEncrypted decryption.
+                // Keep iterating next instruction until we hit the end of the decryption.
+                INCREMENT_NEXT_INSTRUCTION();
+                // Search for the decryption terminating instruction:
+                /* mov     rax, [rsp+120h+NamesDecrypted] */
+                while (!(NextInst->opcode == I_MOV &&
+                         NextInst->ops[1].type == O_SMEM)) {
+                    INCREMENT_NEXT_INSTRUCTION();
+                }
+                INCREMENT_NEXT_INSTRUCTION();
+                // We found the end of the FName::NamesEncryptedinline decryption!
+                NamesDecryptionEnd = NextIp;
+                LOG_INFO(_XOR_("Found the FName::NamesEncrypted decryption ending: 0x%p"),
+                         NamesDecryptionEnd);
+
+                // Increment to the next instruction.
+                INCREMENT_NEXT_INSTRUCTION();
             }
 
             // Handle the next instruction.
@@ -2097,7 +2099,7 @@ int DumpWorld()
     // .text:7FF6FC3954DB 48 39 35 1E 7C 04 03      cmp     qword ptr cs:aXenuinesdkCarv_97, rsi ; "XENUINESDK_CARVE"
     // .text:7FF6FC3954E2 75 10                     jnz     short loc_7FF6FC3954F4
     // 48 8B D9 48 8B 05 ? ? ? ? 48 89 84 24 ? ? ? ? 33 F6
-    Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("48 8B D9 48 8B 05 ?? ?? ?? ?? 48 89 84 24 ?? ?? ?? ?? 33 F6"));
+    Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("48 8B 05 ?? ?? ?? ?? 48 89 84 24 ?? ?? ?? ?? 33 F6"));
     if (!Found) {
         LOG_ERROR(_XOR_("Failed to find GWorld decryption signature!"));
         return ERROR_NOT_FOUND;
@@ -2136,7 +2138,7 @@ int DumpWorld()
         /* mov     rax, cs:GWorld */
         /* mov     [rsp+80h], rax  */
         /* xor     esi, esi  */
-        if (InstIndex == 1 &&
+        if (InstIndex == 0 &&
             Inst->opcode == I_MOV &&
             Inst->ops[1].type == O_SMEM &&
             NextInst->opcode == I_MOV &&

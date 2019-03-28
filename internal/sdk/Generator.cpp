@@ -414,10 +414,10 @@ void GeneratorPackage::GenerateClass(const UClass* ClassObj)
 
         c.PredefinedMethods.push_back(
             GeneratorPredefinedMethod::Default(
-                tfm::format(_XOR_("static UClass* %sClass;\n    static UClass* StaticClass()"), c.NameCpp),
+                tfm::format(_XOR_("static class UClass* %sClass;\n    static class UClass* StaticClass()"), c.NameCpp),
                 tfm::format(_XOR_(
                 "UClass* %s::%sClass = nullptr;\n"
-                "static UClass* %s::StaticClass()\n"
+                "UClass* %s::StaticClass()\n"
                 "{\n"
                 "    if (!%sClass)\n"
                 "        %sClass = UObject::FindClass(%s);\n"
@@ -435,7 +435,7 @@ void GeneratorPackage::GenerateClass(const UClass* ClassObj)
                 tfm::format(_XOR_("static UClass* %sClass;\n    static UClass* StaticClass()"), c.NameCpp),
                 tfm::format(_XOR_(
                     "UClass* %s::%sClass = nullptr;\n"
-                    "static UClass* %s::StaticClass()\n"
+                    "UClass* %s::StaticClass()\n"
                     "{\n"
                     "    if (!%sClass)\n"
                     "        %sClass = UObject::GetObjectCasted<UClass>(%d);\n"
@@ -970,7 +970,7 @@ void GeneratorPackage::PrintClass(std::ostream& os, const GeneratorClass& Class)
 void GeneratorPackage::SaveStructs(const std::experimental::filesystem::path& SdkPath) const
 {
     std::ofstream os(SdkPath / GenerateFileName(FileContentType::Structs, GetPackageObject()));
-    std::vector<std::string> includes{ { tfm::format(_XOR_("Types.h")) } };
+    std::vector<std::string> includes{ { _XORSTR_("../Types.h"), _XORSTR_("../Objects.h") } };
     auto dependencyNames = from(DependencyObjects)
         >> select([](auto&& p) { return GenerateFileName(FileContentType::Classes, p); })
         >> experimental::container();
@@ -1108,7 +1108,7 @@ void Generator::SaveSdkHeader(
 )
 {
     const std::experimental::filesystem::path& path = GetPath();
-    std::ofstream os(path / "sdk.h");
+    std::ofstream os(path / "PUBG_SDK.h");
     os << _XORSTR_("#pragma once\n\n") << tfm::format(_XOR_("// PUBG UE4 SDK\n\n"));
 
     //check for missing structs

@@ -7,8 +7,8 @@
 #include <utils/xorstr.h>
 
 #include "TypeTraits.h"
+#include "Encryption.h"
 #include "Memory.h"
-#include "CryptValue.h"
 
 #include <initializer_list>
 #include <string>
@@ -78,20 +78,14 @@ struct TCanMoveTArrayPointersBetweenArrayTypes {
 };
 }
 
-template<class InElementType, typename InAllocator = FDefaultAllocator>
+template<class ElementType>
 class TArray {
-
-    template <typename OtherInElementType, typename OtherAllocator>
-    friend class TArray;
-
+    friend class FString;
 public:
-    typedef InElementType ElementType;
-    typedef InAllocator Allocator;
+    inline TArray() : Data(nullptr), ArrayNum(0), ArrayMax(0) {}
 
-    inline TArray() : ArrayNum(0), ArrayMax(0) {}
-
-    inline ElementType* GetData() { return (ElementType*)AllocatorInstance.GetAllocation(); }
-    inline const ElementType* GetData() const { return (const ElementType*)AllocatorInstance.GetAllocation(); }
+    inline ElementType* GetData() { return (ElementType*)Data; }
+    inline const ElementType* GetData() const { return (const ElementType*)Data; }
 
     inline uint32_t GetTypeSize() const { return sizeof(ElementType); }
 
@@ -104,13 +98,7 @@ public:
     const ElementType& operator[](int32_t Index) const { return GetData()[Index]; }
 
 protected:
-    typedef typename TChooseClass<
-        Allocator::NeedsElementType,
-        typename Allocator::template ForElementType<ElementType>,
-        typename Allocator::ForAnyElementType
-    >::Result ElementAllocatorType;
-
-    ElementAllocatorType AllocatorInstance;
+    ElementType* Data;
     int32_t ArrayNum;
     int32_t ArrayMax;
 
@@ -146,13 +134,15 @@ public:
 };
 
 struct FName {
-    //FName() : Index(0), Number(0) {}
-    FName(int32_t InIndex, int32_t InNumber) : Index(InIndex), Number(InNumber) {}
+    inline FName() : Index(0), Number(0) {}
+    inline FName(int32_t InIndex, int32_t InNumber) : Index(InIndex), Number(InNumber) {}
 
     inline int32_t GetIndex() const { return Index; }
     inline int32_t GetNumber() const { return Number; }
 
     std::string ToString() const;
+
+    inline bool operator==(const FName &other) const { return Index == other.Index; }
 
     int32_t Index;  // 0x00
     int32_t Number; // 0x04
@@ -169,6 +159,21 @@ private:
     void* InterfacePointer;
 };
 
+template<class TEnum>
+class TEnumAsByte {
+public:
+    inline TEnumAsByte() { }
+    inline TEnumAsByte(TEnum _value) : Value(static_cast<uint8_t>(_value)) { }
+    explicit inline TEnumAsByte(int32_t _value) : Value(static_cast<uint8_t>(_value)) { }
+    explicit inline TEnumAsByte(uint8_t _value) : Value(_value) { }
+
+    inline operator TEnum() const { return (TEnum)Value; }
+    inline TEnum GetValue() const { return (TEnum)Value; }
+
+private:
+    uint8_t Value;
+};
+
 template<class InterfaceType>
 class TScriptInterface : public FScriptInterface {
 public:
@@ -178,8 +183,32 @@ public:
     operator bool() const { return GetInterface() != nullptr; }
 };
 
-struct FText {
-    char UnknownData[0x18];
+/**
+ * ESPMode is used select between either 'fast' or 'thread safe' shared pointer types.
+ * This is only used by templates at compile time to generate one code path or another.
+ */
+enum class ESPMode {
+    NotThreadSafe = 0,
+    Fast = 0,
+    ThreadSafe = 1
+};
+
+template<class ObjectType, ESPMode Mode>
+class TSharedRef {
+public:
+    ObjectType* Object;
+    uint64_t SharedReferenceCount;
+};
+
+class ITextData {
+public:
+    void **VTable;
+};  
+
+class FText {
+public:
+    TSharedRef<ITextData, ESPMode::ThreadSafe> TextData;
+    uint32_t Flags;
 };
 
 struct FWeakObjectPtr {
@@ -214,11 +243,11 @@ struct FUniqueObjectGuid {
 
 class FLazyObjectPtr : public TPersistentObjectPtr<FUniqueObjectGuid> {};
 
-struct FScriptDelegate {
+class FScriptDelegate {
     uint8_t UnknownData[20];
 };
 
-struct FScriptMulticastDelegate {
+class FScriptMulticastDelegate {
     uint8_t UnknownData[16];
 };
 

@@ -4,20 +4,6 @@
 #include <utils/utils.h>
 #include <utils/xorstr.h>
 
-/**
- * Assembly decryption routines.
- */
-#ifdef __cplusplus
-extern "C" {
-#endif
-uint64_t DecryptNamesAsm(uint64_t NamesEncrypted);
-uint64_t DecryptChunksAsm(uint64_t ChunksEncrypted);
-uint64_t DecryptNumElementsAsm(uint64_t NumElementsEncrypted);
-uint64_t DecryptNameEntryIndexAsm(uint64_t IndexEncrypted);
-#ifdef __cplusplus
-}
-#endif
-
 
 /** Maximum size of name. */
 enum { NAME_SIZE = 1024 };
@@ -119,7 +105,7 @@ private:
     uint64_t NumChunksEncrypted;    // 0x10
 };
 
-typedef TStaticIndirectArrayThreadSafeRead<FNameEntry, 2 * 1024 * 1024, 15888> TNameEntryArray;
+typedef TStaticIndirectArrayThreadSafeRead<FNameEntry, 2 * 1024 * 1024, 16628> TNameEntryArray;
 static TNameEntryArray *GNames = NULL;
 
 typedef
@@ -141,16 +127,6 @@ static bool NamesInitializeGlobal()
 
     ImageBase = utils::GetModuleHandleWIDE(NULL);
     ImageSize = utils::GetModuleSize((HMODULE)ImageBase);
-
-    //// E8 ? ? ? ? 4C 8B 15 ? ? ? ? 45 33 FF
-    //static const UINT8 NamesSig[] = {
-    //    0xE8, 0xCC, 0xCC, 0xCC, 0xCC,             /* call    FName__GetNamesEncrypted */
-    //    0x4C, 0x8B, 0x15, 0xCC, 0xCC, 0xCC, 0xCC, /* mov     r10, qword ptr cs:aXenuinesdkCarv_101 */
-    //    0x45, 0x33, 0xFF                          /* xor     r15d, r15d */
-    //};
-    //const uint8_t *Found;
-    //do Found = utils::FindPattern(ImageBase, ImageSize, 0xCC, NamesSig, sizeof(NamesSig));
-    //while (!Found);
 
     // Locate signature inside of the FName::GetEncryptedNames routine:
     // .text:7FF6FDBE6181 E8 9A 89 3A FD                call    tslgame_AK__MemoryMgr__StartProfileThreadUsage

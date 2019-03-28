@@ -109,7 +109,7 @@ TestThreadRoutine(
 
     unreal::InitializeUnrealObjectSizeMap();
 
-    Generator Gen(_XOR_("C:\\Users\\Owner\\Desktop\\sdk"), true, true);
+    Generator Gen(_XOR_("F:\\Projects\\nvdid\\internal\\sdk"), true, true);
 
     Gen.AddPredefinedClassMembers(_XORSTR_("Class CoreUObject.Object"), {
         { "void**",     "VTable",                   sizeof(void**),     0x00 },
@@ -154,7 +154,7 @@ TestThreadRoutine(
     "    static T* FindObject(const std::string& Name)\n"
     "    {\n"
     "        ObjectsProxy Objects;\n"
-    "        for (int i = 0; i < Objects.Num(); ++i) {\n"
+    "        for (int i = 0; i < Objects.GetNum(); ++i) {\n"
     "            UObject* Object = Objects.GetById(i);\n"
     "            if (!Object)\n"
     "                continue;\n"
@@ -210,7 +210,7 @@ TestThreadRoutine(
     "    return FName(Index, Number);\n"
     "}"
         )),
-        GeneratorPredefinedMethod::Default(_XORSTR_("const UPackage* GetOutermost() const"), _XORSTR_(
+        GeneratorPredefinedMethod::Default(_XORSTR_("const class UPackage* GetOutermost() const"), _XORSTR_(
     "const UPackage* UObject::GetOutermost() const\n"
     "{\n"
     "    UObject* Top = NULL;\n"

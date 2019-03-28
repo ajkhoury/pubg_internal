@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Objects.h"
+#include "UnrealTypes.h"
 
 static std::string MakeValidName(std::string&& Name)
 {

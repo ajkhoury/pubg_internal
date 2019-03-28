@@ -34,6 +34,153 @@ DEFINE_STATIC_CLASS(DelegateProperty);
 DEFINE_STATIC_CLASS(MulticastDelegateProperty);
 DEFINE_STATIC_CLASS(EnumProperty);
 
+UProperty::Info UProperty::GetInfo() const
+{
+    if (this != nullptr) {
+
+        //LOG_INFO("IsA<UByteProperty>");
+        if (IsA<UByteProperty>()) {
+            //LOG_INFO("UByteProperty");
+            return Cast<UByteProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UUInt16Property>");
+        if (IsA<UUInt16Property>()) {
+            //LOG_INFO("UUInt16Property");
+            return Cast<UUInt16Property>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UUInt32Property>");
+        if (IsA<UUInt32Property>()) {
+            //LOG_INFO("UUInt32Property");
+            return Cast<UUInt32Property>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UUInt64Property>");
+        if (IsA<UUInt64Property>()) {
+            //LOG_INFO("UUInt64Property");
+            return Cast<UUInt64Property>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UInt8Property>");
+        if (IsA<UInt8Property>()) {
+            //LOG_INFO("UInt8Property");
+            return Cast<UInt8Property>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UInt16Property>");
+        if (IsA<UInt16Property>()) {
+            //LOG_INFO("UInt16Property");
+            return Cast<UInt16Property>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UIntProperty>");
+        if (IsA<UIntProperty>()) {
+            //LOG_INFO("UIntProperty");
+            return Cast<UIntProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UInt64Property>");
+        if (IsA<UInt64Property>()) {
+            //LOG_INFO("UInt64Property");
+            return Cast<UInt64Property>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UFloatProperty>");
+        if (IsA<UFloatProperty>()) {
+            //LOG_INFO("UFloatProperty");
+            return Cast<UFloatProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UDoubleProperty>");
+        if (IsA<UDoubleProperty>()) {
+            //LOG_INFO("UDoubleProperty");
+            return Cast<UDoubleProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UBoolProperty>");
+        if (IsA<UBoolProperty>()) {
+            //LOG_INFO("UBoolProperty");
+            return Cast<UBoolProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UObjectProperty>");
+        if (IsA<UObjectProperty>()) {
+            //LOG_INFO("UObjectProperty");
+            return Cast<UObjectProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UObjectPropertyBase>");
+        if (IsA<UObjectPropertyBase>()) {
+            //LOG_INFO("UObjectPropertyBase");
+            return Cast<UObjectPropertyBase>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UClassProperty>");
+        if (IsA<UClassProperty>()) {
+            //LOG_INFO("UClassProperty");
+            return Cast<UClassProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UInterfaceProperty>");
+        if (IsA<UInterfaceProperty>()) {
+            //LOG_INFO("UInterfaceProperty");
+            return Cast<UInterfaceProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UWeakObjectProperty>");
+        if (IsA<UWeakObjectProperty>()) {
+            //LOG_INFO("UWeakObjectProperty");
+            return Cast<UWeakObjectProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<ULazyObjectProperty>");
+        if (IsA<ULazyObjectProperty>()) {
+            //LOG_INFO("ULazyObjectProperty");
+            return Cast<ULazyObjectProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UAssetObjectProperty>");
+        if (IsA<UAssetObjectProperty>()) {
+            //LOG_INFO("UAssetObjectProperty");
+            return Cast<UAssetObjectProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UAssetClassProperty>");
+        if (IsA<UAssetClassProperty>()) {
+            //LOG_INFO("UAssetClassProperty");
+            return Cast<UAssetClassProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UNameProperty>");
+        if (IsA<UNameProperty>()) {
+            //LOG_INFO("UNameProperty");
+            return Cast<UNameProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UStructProperty>");
+        if (IsA<UStructProperty>()) {
+            //LOG_INFO("UStructProperty");
+            return Cast<UStructProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UStrProperty>");
+        if (IsA<UStrProperty>()) {
+            //LOG_INFO("UStrProperty");
+            return Cast<UStrProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UTextProperty>");
+        if (IsA<UTextProperty>()) {
+            //LOG_INFO("UTextProperty");
+            return Cast<UTextProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UArrayProperty>");
+        if (IsA<UArrayProperty>()) {
+            //LOG_INFO("UArrayProperty");
+            return Cast<UArrayProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UMapProperty>");
+        if (IsA<UMapProperty>()) {
+            //LOG_INFO("UMapProperty");
+            return Cast<UMapProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UDelegateProperty>");
+        if (IsA<UDelegateProperty>()) {
+            //LOG_INFO("UDelegateProperty");
+            return Cast<UDelegateProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UMulticastDelegateProperty>");
+        if (IsA<UMulticastDelegateProperty>()) {
+            //LOG_INFO("UMulticastDelegateProperty");
+            return Cast<UMulticastDelegateProperty>()->GetInfo();
+        }
+        //LOG_INFO("IsA<UEnumProperty>");
+        if (IsA<UEnumProperty>()) {
+            //LOG_INFO("UEnumProperty");
+            return Cast<UEnumProperty>()->GetInfo();
+        }
+    }
+    return { PropertyType::Unknown };
+}
 
 std::string StringifyPropertyFlags(const uint64_t Flags)
 {
@@ -90,162 +237,12 @@ std::string StringifyPropertyFlags(const uint64_t Flags)
     if (Flags & CPF_NativeAccessSpecifierPrivate) { buffer.push_back("NativeAccessSpecifierPrivate"); }
 
     switch (buffer.size()) {
-    case 0:
-        return std::string();
-    case 1:
-        return std::string(buffer[0]);
+    case 0: return std::string();
+    case 1: return std::string(buffer[0]);
     default:
         std::ostringstream os;
         std::copy(buffer.begin(), buffer.end() - 1, std::ostream_iterator<const char*>(os, ", "));
         os << *buffer.rbegin();
         return os.str();
     }
-}
-
-UProperty::Info UProperty::GetInfo() const
-{
-    if (this != nullptr) {
-
-        //LOG_INFO("IsA<BytePropertyProxy>");
-        if (IsA<UByteProperty>()) {
-            //LOG_INFO("BytePropertyProxy");
-            return Cast<UByteProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<UInt16PropertyProxy>");
-        if (IsA<UUInt16Property>()) {
-            //LOG_INFO("UInt16PropertyProxy");
-            return Cast<UUInt16Property>()->GetInfo();
-        }
-        //LOG_INFO("IsA<UInt32PropertyProxy>");
-        if (IsA<UUInt32Property>()) {
-            //LOG_INFO("UInt32PropertyProxy");
-            return Cast<UUInt32Property>()->GetInfo();
-        }
-        //LOG_INFO("IsA<UInt64PropertyProxy>");
-        if (IsA<UUInt64Property>()) {
-            //LOG_INFO("UInt64PropertyProxy");
-            return Cast<UUInt64Property>()->GetInfo();
-        }
-        //LOG_INFO("IsA<Int8PropertyProxy>");
-        if (IsA<UInt8Property>()) {
-            //LOG_INFO("Int8PropertyProxy");
-            return Cast<UInt8Property>()->GetInfo();
-        }
-        //LOG_INFO("IsA<Int16PropertyProxy>");
-        if (IsA<UInt16Property>()) {
-            //LOG_INFO("Int16PropertyProxy");
-            return Cast<UInt16Property>()->GetInfo();
-        }
-        //LOG_INFO("IsA<IntPropertyProxy>");
-        if (IsA<UIntProperty>()) {
-            //LOG_INFO("IntPropertyProxy");
-            return Cast<UIntProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<Int64PropertyProxy>");
-        if (IsA<UInt64Property>()) {
-            //LOG_INFO("Int64PropertyProxy");
-            return Cast<UInt64Property>()->GetInfo();
-        }
-        //LOG_INFO("IsA<FloatPropertyProxy>");
-        if (IsA<UFloatProperty>()) {
-            //LOG_INFO("FloatPropertyProxy");
-            return Cast<UFloatProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<DoublePropertyProxy>");
-        if (IsA<UDoubleProperty>()) {
-            //LOG_INFO("DoublePropertyProxy");
-            return Cast<UDoubleProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<BoolPropertyProxy>");
-        if (IsA<UBoolProperty>()) {
-            //LOG_INFO("BoolPropertyProxy");
-            return Cast<UBoolProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<ObjectPropertyProxy>");
-        if (IsA<UObjectProperty>()) {
-            //LOG_INFO("ObjectPropertyProxy");
-            return Cast<UObjectProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<ObjectPropertyBaseProxy>");
-        if (IsA<UObjectPropertyBase>()) {
-            //LOG_INFO("ObjectPropertyBaseProxy");
-            return Cast<UObjectPropertyBase>()->GetInfo();
-        }
-        //LOG_INFO("IsA<ClassPropertyProxy>");
-        if (IsA<UClassProperty>()) {
-            //LOG_INFO("ClassPropertyProxy");
-            return Cast<UClassProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<InterfacePropertyProxy>");
-        if (IsA<UInterfaceProperty>()) {
-            //LOG_INFO("InterfacePropertyProxy");
-            return Cast<UInterfaceProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<WeakObjectPropertyProxy>");
-        if (IsA<UWeakObjectProperty>()) {
-            //LOG_INFO("WeakObjectPropertyProxy");
-            return Cast<UWeakObjectProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<LazyObjectPropertyProxy>");
-        if (IsA<ULazyObjectProperty>()) {
-            //LOG_INFO("LazyObjectPropertyProxy");
-            return Cast<ULazyObjectProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<AssetObjectPropertyProxy>");
-        if (IsA<UAssetObjectProperty>()) {
-            //LOG_INFO("AssetObjectPropertyProxy");
-            return Cast<UAssetObjectProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<AssetClassPropertyProxy>");
-        if (IsA<UAssetClassProperty>()) {
-            //LOG_INFO("AssetClassPropertyProxy");
-            return Cast<UAssetClassProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<NamePropertyProxy>");
-        if (IsA<UNameProperty>()) {
-            //LOG_INFO("NamePropertyProxy");
-            return Cast<UNameProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<StructPropertyProxy>");
-        if (IsA<UStructProperty>()) {
-            //LOG_INFO("StructPropertyProxy");
-            return Cast<UStructProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<StrPropertyProxy>");
-        if (IsA<UStrProperty>()) {
-            //LOG_INFO("StrPropertyProxy");
-            return Cast<UStrProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<TextPropertyProxy>");
-        if (IsA<UTextProperty>()) {
-            //LOG_INFO("TextPropertyProxy");
-            return Cast<UTextProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<ArrayPropertyProxy>");
-        if (IsA<UArrayProperty>()) {
-            //LOG_INFO("ArrayPropertyProxy");
-            return Cast<UArrayProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<MapPropertyProxy>");
-        if (IsA<UMapProperty>()) {
-            //LOG_INFO("MapPropertyProxy");
-            return Cast<UMapProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<DelegatePropertyProxy>");
-        if (IsA<UDelegateProperty>()) {
-            //LOG_INFO("DelegatePropertyProxy");
-            return Cast<UDelegateProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<MulticastDelegatePropertyProxy>");
-        if (IsA<UMulticastDelegateProperty>()) {
-            //LOG_INFO("MulticastDelegatePropertyProxy");
-            return Cast<UMulticastDelegateProperty>()->GetInfo();
-        }
-        //LOG_INFO("IsA<EnumPropertyProxy>");
-        if (IsA<UEnumProperty>()) {
-            //LOG_INFO("EnumPropertyProxy");
-            return Cast<UEnumProperty>()->GetInfo();
-        }
-    }
-    return { PropertyType::Unknown };
 }

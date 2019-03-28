@@ -83,3 +83,32 @@ union CryptValue {
 #ifndef __PAIR64__
 #define __PAIR64__(hi, low) ((unsigned __int64)(((unsigned __int64)(hi) << 32) | (unsigned __int32)(low)))
 #endif 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * Names asm decryption routines.
+ */
+unsigned __int64 DecryptNamesAsm(unsigned __int64 NamesEncrypted);
+unsigned __int64 DecryptChunksAsm(unsigned __int64 ChunksEncrypted);
+unsigned __int64 DecryptNumElementsAsm(unsigned __int64 NumElementsEncrypted);
+unsigned __int64 DecryptNameEntryIndexAsm(unsigned __int64 IndexEncrypted);
+
+/**
+ * Objects asm decryption routines
+ */
+unsigned __int64 DecryptObjectsAsm(unsigned __int64 ObjectsEncrypted);
+unsigned int DecryptObjectFlagsAsm(unsigned int ObjectFlagsEncrypted);
+unsigned int DecryptObjectIndexAsm(unsigned int InternalIndexEncrypted);
+unsigned __int64 DecryptObjectClassAsm(unsigned __int64 ClassEncrypted);
+unsigned __int64 DecryptObjectOuterAsm(unsigned __int64 OuterEncrypted);
+void DecryptObjectFNameAsm(const int InNameIndexEncrypted,
+                           const int InNameNumberEncrypted,
+                           int* OutNameIndex,
+                           int* OutNameNumber);
+
+#ifdef __cplusplus
+}
+#endif

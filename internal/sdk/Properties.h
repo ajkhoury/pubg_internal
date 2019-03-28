@@ -2,7 +2,55 @@
 
 #include "Objects.h"
 #include "Format.h"
+
+#include "UnrealTypes.h"
+
 #include <array>
+
+class UProperty : public UField {
+public:
+    int32_t ArrayDim; // 0x0038 (size=0x0004)
+    int32_t ElementSize; // 0x003C (size=0x0004)
+    uint64_t PropertyFlags; // 0x0040 (size=0x0008)
+    uint8_t UnknownData0x0048[0x10]; // 0x0048 (size=0x0010)
+    int32_t Offset_Internal; // 0x0058 (size=0x0004)
+    uint8_t UnknownData0x005C[0x24]; // 0x005C (size=0x0024)
+
+    inline int32_t GetArrayDim() const { return ArrayDim; }
+    inline int32_t GetElementSize() const { return ElementSize; }
+    inline uint64_t GetPropertyFlags() const { return PropertyFlags; }
+    inline int32_t GetOffset() const { return Offset_Internal; }
+
+    enum class PropertyType {
+        Unknown,
+        Primitive,
+        PredefinedStruct,
+        CustomStruct,
+        Container
+    };
+
+    struct Info {
+        PropertyType Type;
+        int32_t Size;
+        bool CanBeReference;
+        std::string CppType;
+
+        static Info Create(PropertyType Type, int32_t Size, bool bCanBeReference, std::string&& CppType)
+        {
+            Info NewInfo;
+            NewInfo.Type = Type;
+            NewInfo.Size = Size;
+            NewInfo.CanBeReference = bCanBeReference;
+            NewInfo.CppType = CppType;
+            return NewInfo;
+        }
+    };
+
+    UProperty::Info GetInfo() const;
+
+    DECLARE_STATIC_CLASS(Property);
+}; // size=0x0080
+C_ASSERT(sizeof(UProperty) == 0x80);
 
 enum PropertyFlags : uint64_t {
     CPF_Edit = 0x0000000000000001,
@@ -63,7 +111,7 @@ enum PropertyFlags : uint64_t {
     CPF_PropagateToMapKey = (CPF_ExportObject | CPF_PersistentInstance | CPF_InstancedReference | CPF_ContainsInstancedReference | CPF_Config | CPF_EditConst | CPF_Deprecated | CPF_EditorOnly | CPF_AutoWeak | CPF_UObjectWrapper | CPF_Edit),
     CPF_PropagateToSetElement = (CPF_ExportObject | CPF_PersistentInstance | CPF_InstancedReference | CPF_ContainsInstancedReference | CPF_Config | CPF_EditConst | CPF_Deprecated | CPF_EditorOnly | CPF_AutoWeak | CPF_UObjectWrapper | CPF_Edit),
     /** the flags that should never be set on interface properties */
-    CPF_InterfaceClearMask = (CPF_ExportObject|CPF_InstancedReference|CPF_ContainsInstancedReference),
+    CPF_InterfaceClearMask = (CPF_ExportObject | CPF_InstancedReference | CPF_ContainsInstancedReference),
     /** all the properties that can be stripped for final release console builds */
     CPF_DevelopmentAssets = (CPF_EditorOnly),
     /** all the properties that should never be loaded or saved */
@@ -73,50 +121,6 @@ enum PropertyFlags : uint64_t {
 
 std::string StringifyPropertyFlags(const uint64_t Flags);
 
-class UProperty : public UField {
-public:
-    int32_t ArrayDim; // 0x0030 (size=0x0004)
-    int32_t ElementSize; // 0x0034 (size=0x0004)
-    uint64_t PropertyFlags; // 0x0038 (size=0x0008)
-    uint8_t UnknownData0x0040[0x10]; // 0x0040 (size=0x0010)
-    int32_t Offset_Internal; // 0x0050 (size=0x0004)
-    uint8_t UnknownData0x0054[0x24]; // 0x0054 (size=0x0024)
-
-    inline int32_t GetArrayDim() const { return ArrayDim; }
-    inline int32_t GetElementSize() const { return ElementSize; }
-    inline uint64_t GetPropertyFlags() const { return PropertyFlags; }
-    inline int32_t GetOffset() const { return Offset_Internal; }
-
-    enum class PropertyType {
-        Unknown,
-        Primitive,
-        PredefinedStruct,
-        CustomStruct,
-        Container
-    };
-
-    struct Info {
-        PropertyType Type;
-        int32_t Size;
-        bool CanBeReference;
-        std::string CppType;
-
-        static Info Create(PropertyType Type, int32_t Size, bool bCanBeReference, std::string&& CppType)
-        {
-            Info NewInfo;
-            NewInfo.Type = Type;
-            NewInfo.Size = Size;
-            NewInfo.CanBeReference = bCanBeReference;
-            NewInfo.CppType = CppType;
-            return NewInfo;
-        }
-    };
-
-    UProperty::Info GetInfo() const;
-
-    DECLARE_STATIC_CLASS(Property);
-}; // size=0x0078
-C_ASSERT(sizeof(UProperty) == 0x78);
 
 class UNumericProperty : public UProperty {
 public:
@@ -445,7 +449,7 @@ class UStrProperty : public UProperty {
 public:
     UProperty::Info GetInfo() const
     {
-        return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FString), true, "struct FString");
+        return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FString), true, "class FString");
     }
 
     DECLARE_STATIC_CLASS(StrProperty);
@@ -455,7 +459,7 @@ class UTextProperty : public UProperty {
 public:
     UProperty::Info GetInfo() const
     {
-        return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FText), true, "struct FText");
+        return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FText), true, "class FText");
     }
 
     DECLARE_STATIC_CLASS(TextProperty);
@@ -517,7 +521,7 @@ public:
 
     UProperty::Info GetInfo() const
     {
-        return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FScriptDelegate), true, "struct FScriptDelegate");
+        return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FScriptDelegate), true, "class FScriptDelegate");
     }
 
     DECLARE_STATIC_CLASS(DelegateProperty);
@@ -531,7 +535,7 @@ public:
 
     UProperty::Info GetInfo() const
     {
-        return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FScriptMulticastDelegate), true, "struct FScriptMulticastDelegate");
+        return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FScriptMulticastDelegate), true, "class FScriptMulticastDelegate");
     }
 
     DECLARE_STATIC_CLASS(MulticastDelegateProperty);
