@@ -4,11 +4,13 @@
 PUBLIC DecryptNamesAsm
 DecryptNamesAsm PROC
         push    rbx
+        push    rdi
+        push    rsi
         push    rbp
         sub     rsp, 8
         mov     rbp, rsp
 
-        mov     eax, ecx                ; RCX = NamesEncrypted
+        mov     rax, rcx                ; RCX = NamesEncrypted
         xor     eax,048c1fc42h
         not     eax
         sub     eax,02d6db572h
@@ -24,6 +26,8 @@ DecryptNamesAsm PROC
 
         add     rsp, 8
         pop     rbp
+        pop     rsi
+        pop     rdi
         pop     rbx
         ret
 DecryptNamesAsm ENDP
@@ -36,7 +40,7 @@ DecryptNameEntryIndexAsm PROC
         sub     rsp, 8
         mov     rbp, rsp
 
-        mov     eax, ecx                ; RCX = IndexEncrypted
+        mov     rax, rcx                ; RCX = IndexEncrypted
         xor     eax,0193e03bdh
         rol     eax,8
         sub     eax,04bcb9bf4h
@@ -54,7 +58,6 @@ DecryptNameEntryIndexAsm PROC
         mov     DWORD PTR [rbp+4],ecx
         mov     rax,QWORD PTR [rbp]
 
-
         add     rsp, 8
         pop     rbp
         pop     rbx
@@ -69,7 +72,7 @@ DecryptChunksAsm PROC
         sub     rsp, 8
         mov     rbp, rsp
 
-        mov     eax,ecx
+        mov     rax,rcx
         rol     eax,16
         sub     eax,073f3234ch
         rol     eax,16
@@ -99,7 +102,7 @@ DecryptNumElementsAsm PROC
         sub     rsp, 8
         mov     rbp, rsp
 
-        mov     eax,ecx
+        mov     rax,rcx
         not     eax
         shr     rcx,32
         add     eax,049618a8fh

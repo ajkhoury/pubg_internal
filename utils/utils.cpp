@@ -341,7 +341,7 @@ FindFunctionStartFromPtr(
     }
 
     if (!MaxSearchSize) {
-        MaxSearchSize = MAXSIZE_T;
+        MaxSearchSize = ~((SIZE_T)0);
     }
 
     P = (const UINT8 *)Ptr;

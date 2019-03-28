@@ -7,6 +7,7 @@
 #include <utils/xorstr.h>
 
 #include "TypeTraits.h"
+#include "EnumClassFlags.h"
 #include "Encryption.h"
 #include "Memory.h"
 
@@ -80,7 +81,7 @@ struct TCanMoveTArrayPointersBetweenArrayTypes {
 
 template<class ElementType>
 class TArray {
-    friend class FString;
+    friend struct FString;
 public:
     inline TArray() : Data(nullptr), ArrayNum(0), ArrayMax(0) {}
 
@@ -113,7 +114,7 @@ private:
     inline friend const ElementType* end(const TArray& Array) { return Array.GetData() + Array.Num(); }
 };
 
-class FString {
+struct FString {
 private:
     /** Array holding the character data */
     typedef TArray<wchar_t> DataType;
@@ -130,7 +131,7 @@ public:
         return str;
     }
 
-    wchar_t *Get() const { return const_cast<wchar_t *>(Data.GetData()); }
+    ElementType *Get() const { return const_cast<ElementType *>(Data.GetData()); }
 };
 
 struct FName {
@@ -205,7 +206,7 @@ public:
     void **VTable;
 };  
 
-class FText {
+struct FText {
 public:
     TSharedRef<ITextData, ESPMode::ThreadSafe> TextData;
     uint32_t Flags;
@@ -216,10 +217,6 @@ struct FWeakObjectPtr {
     int32_t ObjectSerialNumber;
 };
 
-struct FStringAssetReference {
-    FString AssetLongPathname;
-};
-
 template<typename TObjectID>
 class TPersistentObjectPtr {
 public:
@@ -228,9 +225,7 @@ public:
     TObjectID ObjectID;
 };
 
-class FAssetPtr : public TPersistentObjectPtr<FStringAssetReference> {};
-
-struct FGuid {
+struct UGuid {
     uint32_t A;     // 0x00
     uint32_t B;     // 0x04
     uint32_t C;     // 0x08
@@ -238,23 +233,42 @@ struct FGuid {
 };
 
 struct FUniqueObjectGuid {
-    FGuid Guid;     // 0x00
+    UGuid Guid;     // 0x00
 };
 
-class FLazyObjectPtr : public TPersistentObjectPtr<FUniqueObjectGuid> {};
-
-class FScriptDelegate {
-    uint8_t UnknownData[20];
+struct FSoftObjectPath {
+    FName AssetPathName;
+    FString SubPathString;
 };
 
-class FScriptMulticastDelegate {
-    uint8_t UnknownData[16];
+struct FSoftObjectPtr : public TPersistentObjectPtr<FSoftObjectPath> {
+};
+typedef FSoftObjectPtr FAssetPtr;
+
+class FLazyObjectPtr : public TPersistentObjectPtr<FUniqueObjectGuid> {
 };
 
-class FUObjectItem {
+template <typename TWeakPtr = FWeakObjectPtr>
+class TScriptDelegate {
 public:
-    UObject *Object; // 0x00
-    int32_t Flags; // 0x08
-    int32_t ClusterIndex; // 0x0C
-    int32_t SerialNumber; // 0x10
-}; // size=0x18
+    /** The object bound to this delegate, or nullptr if no object is bound */
+    TWeakPtr Object;
+    /** Name of the function to call on the bound object */
+    FName FunctionName;
+};
+
+template <typename TWeakPtr = FWeakObjectPtr>
+class TMulticastScriptDelegate {
+public:
+    /** Ordered list functions to invoke when the Broadcast function is called */
+    typedef TArray< TScriptDelegate<TWeakPtr> > FInvocationList;
+    mutable FInvocationList InvocationList;     // Mutable so that we can housekeep list even with 'const' broadcasts
+};
+
+// Typedef script delegates for convenience.
+typedef TScriptDelegate<> FScriptDelegate;
+typedef TMulticastScriptDelegate<> FMulticastScriptDelegate;
+
+struct FScriptMulticastDelegate {
+    FMulticastScriptDelegate Delegate;
+};

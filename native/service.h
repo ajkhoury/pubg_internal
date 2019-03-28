@@ -1,6 +1,7 @@
 #pragma once
 
 #include "native.h"
+#include <winsvc.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Objects.h"
-#include "Properties.h"
 #include "cpplinq.h"
 #include "tinyformat.h"
 
@@ -254,7 +253,7 @@ public:
 
 public:
     // Public static fields.
-    static std::unordered_map<const UPackage*, const GeneratorPackage*> PackageMap;
+    static std::unordered_map<class UPackage const*, const GeneratorPackage*> PackageMap;
     static std::unordered_map<std::string, int32_t> AlignasClasses;
 
     // Gets alignas size for the specific class.
@@ -291,17 +290,17 @@ class GeneratorPackage {
     friend struct GeneratorPackageDependencyComparer;
 
 public:
-    GeneratorPackage(const Generator* InGenerator, const UPackage* PackageObj)
+    GeneratorPackage(const Generator* InGenerator, class UPackage const* PackageObj)
         : Generator(InGenerator)
-        , PackageObject(const_cast<UPackage*>(PackageObj))
+        , PackageObject(PackageObj)
     {
     }
 
-    inline GeneratorPackage& operator=(const UPackage* InPackage) { PackageObject = InPackage; return *this; }
+    inline GeneratorPackage& operator=(class UPackage const* InPackage) { PackageObject = InPackage; return *this; }
     inline GeneratorPackage& operator=(const GeneratorPackage& InPackage) { PackageObject = InPackage.PackageObject; return *this; }
 
-    inline const UPackage* GetPackageObject() const { return PackageObject; }
-    inline std::string GetName() const { return PackageObject->GetName(); }
+    inline class UPackage const* GetPackageObject() const { return PackageObject; }
+    std::string GetName() const;
 
     // Process the classes the Package contains.
     void Process(const ObjectsProxy& Objects, std::unordered_map<const UObject*, bool>& ProcessedObjects);
@@ -311,7 +310,7 @@ public:
 
 private:
     // Add object to the dependency objects list.
-    inline bool AddDependency(const UPackage* Package) const
+    inline bool AddDependency(class UPackage const* Package) const
     {
         if (Package && Package != PackageObject) {
             DependencyObjects.insert(Package);
@@ -323,17 +322,17 @@ private:
     // Checks and generates the prerequisites of the object.
     void GeneratePrerequisites(const UObject* Obj, std::unordered_map<const UObject*, bool>& ProcessedObjects);
     // Checks and generates the prerequisites of the members.
-    void GenerateMemberPrerequisites(const UProperty* First, std::unordered_map<const UObject*, bool>& ProcessedObjects);
+    void GenerateMemberPrerequisites(class UProperty const* First, std::unordered_map<class UObject const*, bool>& ProcessedObjects);
     // Generates an enum.
-    void GenerateEnum(const UEnum* Enum);
+    void GenerateEnum(class UEnum const* Enum);
     // Generates the methods of a class.
-    void GenerateMethods(const UClass* classObj, std::vector<GeneratorMethod>& methods) const;
+    void GenerateMethods(class UClass const* classObj, std::vector<GeneratorMethod>& methods) const;
     // Generates the members of a struct or class.
-    void GenerateMembers(const UStruct* Struct, int32_t Offset, const std::vector<UProperty*>& Props, std::vector<GeneratorMember>& Members) const;
+    void GenerateMembers(class UStruct const* Struct, int32_t Offset, const std::vector<UProperty*>& Props, std::vector<GeneratorMember>& Members) const;
     // Generates a class.
-    void GenerateClass(const UClass* Class);
+    void GenerateClass(class UClass const* Class);
     // Generates a script structure.
-    void GenerateScriptStruct(const UScriptStruct* ScriptStruct);
+    void GenerateScriptStruct(class UScriptStruct const* ScriptStruct);
 
 
     // Writes all structs into the appropriate file.
@@ -349,9 +348,9 @@ private:
     const Generator* Generator;
 
     // The package object describing this generator package.
-    const UPackage* PackageObject;
+    class UPackage const* PackageObject;
     // Dependency objects of this package object.
-    mutable std::unordered_set<const UPackage*> DependencyObjects;
+    mutable std::unordered_set<class UPackage const*> DependencyObjects;
 
     // Prints the c++ code of the constant.
     void PrintConstant(std::ostream& os, const std::pair<std::string, std::string>& Constant) const;

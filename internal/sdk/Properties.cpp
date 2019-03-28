@@ -1,7 +1,6 @@
-#include "Properties.h"
-
-#include <sstream>
-#include <iterator>
+#include "UnrealTypes.h"
+#include "Objects.h"
+#include "Format.h"
 
 DEFINE_STATIC_CLASS(Property);
 DEFINE_STATIC_CLASS(NumericProperty);
@@ -182,67 +181,229 @@ UProperty::Info UProperty::GetInfo() const
     return { PropertyType::Unknown };
 }
 
-std::string StringifyPropertyFlags(const uint64_t Flags)
+UProperty::Info UByteProperty::GetInfo() const
 {
-    std::vector<const char*> buffer;
-
-    if (Flags & CPF_Edit) { buffer.push_back("Edit"); }
-    if (Flags & CPF_ConstParm) { buffer.push_back("ConstParm"); }
-    if (Flags & CPF_BlueprintVisible) { buffer.push_back("BlueprintVisible"); }
-    if (Flags & CPF_ExportObject) { buffer.push_back("ExportObject"); }
-    if (Flags & CPF_BlueprintReadOnly) { buffer.push_back("BlueprintReadOnly"); }
-    if (Flags & CPF_Net) { buffer.push_back("Net"); }
-    if (Flags & CPF_EditFixedSize) { buffer.push_back("EditFixedSize"); }
-    if (Flags & CPF_Parm) { buffer.push_back("Parm"); }
-    if (Flags & CPF_OutParm) { buffer.push_back("OutParm"); }
-    if (Flags & CPF_ZeroConstructor) { buffer.push_back("ZeroConstructor"); }
-    if (Flags & CPF_ReturnParm) { buffer.push_back("ReturnParm"); }
-    if (Flags & CPF_DisableEditOnTemplate) { buffer.push_back("DisableEditOnTemplate"); }
-    if (Flags & CPF_Transient) { buffer.push_back("Transient"); }
-    if (Flags & CPF_Config) { buffer.push_back("Config"); }
-    if (Flags & CPF_DisableEditOnInstance) { buffer.push_back("DisableEditOnInstance"); }
-    if (Flags & CPF_EditConst) { buffer.push_back("EditConst"); }
-    if (Flags & CPF_GlobalConfig) { buffer.push_back("GlobalConfig"); }
-    if (Flags & CPF_InstancedReference) { buffer.push_back("InstancedReference"); }
-    if (Flags & CPF_DuplicateTransient) { buffer.push_back("DuplicateTransient"); }
-    if (Flags & CPF_SubobjectReference) { buffer.push_back("SubobjectReference"); }
-    if (Flags & CPF_SaveGame) { buffer.push_back("SaveGame"); }
-    if (Flags & CPF_NoClear) { buffer.push_back("NoClear"); }
-    if (Flags & CPF_ReferenceParm) { buffer.push_back("ReferenceParm"); }
-    if (Flags & CPF_BlueprintAssignable) { buffer.push_back("BlueprintAssignable"); }
-    if (Flags & CPF_Deprecated) { buffer.push_back("Deprecated"); }
-    if (Flags & CPF_IsPlainOldData) { buffer.push_back("IsPlainOldData"); }
-    if (Flags & CPF_RepSkip) { buffer.push_back("RepSkip"); }
-    if (Flags & CPF_RepNotify) { buffer.push_back("RepNotify"); }
-    if (Flags & CPF_Interp) { buffer.push_back("Interp"); }
-    if (Flags & CPF_NonTransactional) { buffer.push_back("NonTransactional"); }
-    if (Flags & CPF_EditorOnly) { buffer.push_back("EditorOnly"); }
-    if (Flags & CPF_NoDestructor) { buffer.push_back("NoDestructor"); }
-    if (Flags & CPF_AutoWeak) { buffer.push_back("AutoWeak"); }
-    if (Flags & CPF_ContainsInstancedReference) { buffer.push_back("ContainsInstancedReference"); }
-    if (Flags & CPF_AssetRegistrySearchable) { buffer.push_back("AssetRegistrySearchable"); }
-    if (Flags & CPF_SimpleDisplay) { buffer.push_back("SimpleDisplay"); }
-    if (Flags & CPF_AdvancedDisplay) { buffer.push_back("AdvancedDisplay"); }
-    if (Flags & CPF_Protected) { buffer.push_back("Protected"); }
-    if (Flags & CPF_BlueprintCallable) { buffer.push_back("BlueprintCallable"); }
-    if (Flags & CPF_BlueprintAuthorityOnly) { buffer.push_back("BlueprintAuthorityOnly"); }
-    if (Flags & CPF_TextExportTransient) { buffer.push_back("TextExportTransient"); }
-    if (Flags & CPF_NonPIEDuplicateTransient) { buffer.push_back("NonPIEDuplicateTransient"); }
-    if (Flags & CPF_ExposeOnSpawn) { buffer.push_back("ExposeOnSpawn"); }
-    if (Flags & CPF_PersistentInstance) { buffer.push_back("PersistentInstance"); }
-    if (Flags & CPF_UObjectWrapper) { buffer.push_back("UObjectWrapper"); }
-    if (Flags & CPF_HasGetValueTypeHash) { buffer.push_back("HasGetValueTypeHash"); }
-    if (Flags & CPF_NativeAccessSpecifierPublic) { buffer.push_back("NativeAccessSpecifierPublic"); }
-    if (Flags & CPF_NativeAccessSpecifierProtected) { buffer.push_back("NativeAccessSpecifierProtected"); }
-    if (Flags & CPF_NativeAccessSpecifierPrivate) { buffer.push_back("NativeAccessSpecifierPrivate"); }
-
-    switch (buffer.size()) {
-    case 0: return std::string();
-    case 1: return std::string(buffer[0]);
-    default:
-        std::ostringstream os;
-        std::copy(buffer.begin(), buffer.end() - 1, std::ostream_iterator<const char*>(os, ", "));
-        os << *buffer.rbegin();
-        return os.str();
+    if (IsEnum()) {
+        return UProperty::Info::Create(PropertyType::Primitive, sizeof(uint8_t), false, "TEnumAsByte<" + fmt::MakeUniqueEnumCppName(GetEnum()) + ">");
     }
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(uint8_t), false, "unsigned char");
 }
+
+UProperty::Info UUInt16Property::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(uint16_t), false, "uint16_t");
+}
+
+UProperty::Info UUInt32Property::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(uint32_t), false, "uint32_t");
+}
+
+UProperty::Info UUInt64Property::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(uint64_t), false, "uint64_t");
+}
+
+UProperty::Info UInt8Property::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(int8_t), false, "int8_t");
+}
+
+UProperty::Info UInt16Property::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(int16_t), false, "int16_t");
+}
+
+UProperty::Info UIntProperty::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(int), false, "int");
+}
+
+UProperty::Info UInt64Property::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(int64_t), false, "int64_t");
+}
+
+UProperty::Info UFloatProperty::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(float), false, "float");
+}
+
+UProperty::Info UDoubleProperty::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(double), false, "double");
+}
+
+UProperty::Info UBoolProperty::GetInfo() const
+{
+    if (IsNativeBool()) {
+        return UProperty::Info::Create(PropertyType::Primitive, sizeof(bool), false, "bool");
+    }
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(unsigned char), false, "unsigned char");
+}
+
+inline int GetBitPosition(uint8_t value)
+{
+    int i4 = !(value & 0xf) << 2;
+    value >>= i4;
+    int i2 = !(value & 0x3) << 1;
+    value >>= i2;
+    int i1 = !(value & 0x1);
+    int i0 = (value >> i1) & 1 ? 0 : -8;
+    return i4 + i2 + i1 + i0;
+}
+
+UBoolProperty::MissingBitsCount UBoolProperty::GetMissingBitsCount(const UBoolProperty* Other) const
+{
+    // If there is no previous bitfield member, just calculate the missing bits.
+    if (!Other) {
+        return { GetBitPosition(GetByteMask()), -1 };
+    }
+
+    // If both bitfield member belong to the same byte, calculate the bit position difference.
+    if (GetOffset() == Other->GetOffset()) {
+        return { GetBitPosition(GetByteMask()) - GetBitPosition(Other->GetByteMask()) - 1, -1 };
+    }
+
+    // If they have different offsets, we need two distances
+    // |00001000|00100000|
+    // 1.   ^---^
+    // 2.       ^--^
+    return { std::numeric_limits<uint8_t>::digits - GetBitPosition(Other->GetByteMask()) - 1, GetBitPosition(GetByteMask()) };
+}
+
+UProperty::Info UObjectPropertyBase::GetInfo() const
+{
+    UClass* Class = GetPropertyClass();
+    if (Class) {
+        return UProperty::Info::Create(PropertyType::Primitive, sizeof(void*), false, "class " + fmt::MakeValidName(Class->GetNameCPP()) + '*');
+    }
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(void*), false, _XORSTR_("/*WARNING PropertyClass NULL*/ class !!INVALID!!"));
+}
+
+UProperty::Info UObjectProperty::GetInfo() const
+{
+    UClass* Class = GetPropertyClass();
+    if (Class) {
+        return UProperty::Info::Create(PropertyType::Primitive, sizeof(void*), false, "class " + fmt::MakeValidName(Class->GetNameCPP()) + '*');
+    }
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(void*), false, _XORSTR_("/*WARNING PropertyClass NULL*/ class !!INVALID!!"));
+}
+
+UProperty::Info UClassProperty::GetInfo() const
+{
+    UClass* Class = GetMetaClass();
+    if (Class) {
+        return UProperty::Info::Create(PropertyType::Primitive, sizeof(void*), false, "class " + fmt::MakeValidName(Class->GetNameCPP()) + '*');
+    }
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(void*), false, _XORSTR_("/*WARNING MetaClass NULL*/ class !!INVALID!!"));
+}
+
+UProperty::Info UInterfaceProperty::GetInfo() const
+{
+    UClass* Class = GetInterfaceClass();
+    if (Class) {
+        return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FScriptInterface), true, "TScriptInterface<class " + fmt::MakeValidName(Class->GetNameCPP()) + '>');
+    }
+    return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FScriptInterface), true, _XORSTR_("/*WARNING InterfaceClass NULL*/ TScriptInterface<class !!INVALID!!>"));
+}
+
+UProperty::Info UWeakObjectProperty::GetInfo() const
+{
+    UClass* Class = GetPropertyClass();
+    if (Class) {
+        return UProperty::Info::Create(PropertyType::Container, sizeof(FWeakObjectPtr), false, "TWeakObjectPtr<class " + fmt::MakeValidName(Class->GetNameCPP()) + '>');
+    }
+    return UProperty::Info::Create(PropertyType::Container, sizeof(FWeakObjectPtr), true, _XORSTR_("/*WARNING PropertyClass NULL*/ TWeakObjectPtr<class !!INVALID!!>"));
+}
+
+UProperty::Info ULazyObjectProperty::GetInfo() const
+{
+    UClass* Class = GetPropertyClass();
+    if (Class) {
+        return UProperty::Info::Create(PropertyType::Container, sizeof(FLazyObjectPtr), false, "TLazyObjectPtr<class " + fmt::MakeValidName(Class->GetNameCPP()) + '>');
+    }
+    return UProperty::Info::Create(PropertyType::Container, sizeof(FLazyObjectPtr), true, _XORSTR_("/*WARNING PropertyClass NULL*/ TLazyObjectPtr<class !!INVALID!!>"));
+}
+
+UProperty::Info UAssetObjectProperty::GetInfo() const
+{
+    UClass* Class = GetPropertyClass();
+    if (Class) {
+        return UProperty::Info::Create(PropertyType::Container, sizeof(FAssetPtr), false, "TAssetPtr<class " + fmt::MakeValidName(Class->GetNameCPP()) + '>');
+    }
+    return UProperty::Info::Create(PropertyType::Container, sizeof(FAssetPtr), true, _XORSTR_("/*WARNING PropertyClass NULL*/ TAssetPtr<class !!INVALID!!>"));
+}
+
+UProperty::Info UAssetClassProperty::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(uint8_t), false, "");
+}
+
+UProperty::Info UNameProperty::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FName), true, "struct FName");
+}
+
+UProperty::Info UStructProperty::GetInfo() const
+{
+    UScriptStruct* ScriptStruct = GetStruct();
+    if (ScriptStruct) {
+        return UProperty::Info::Create(PropertyType::CustomStruct, GetElementSize(), true, "struct " + fmt::MakeUniqueStructCppName(ScriptStruct));
+    }
+    return UProperty::Info::Create(PropertyType::CustomStruct, GetElementSize(), true, _XORSTR_("/*WARNING Struct NULL*/ struct !!INVALID!!"));
+}
+
+UProperty::Info UStrProperty::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FString), true, "FString");
+}
+
+UProperty::Info UTextProperty::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FText), true, "FText");
+}
+
+UProperty::Info UArrayProperty::GetInfo() const
+{
+    UProperty* InnerProperty = GetInner();
+    if (InnerProperty) {
+        UProperty::Info InnerInfo = InnerProperty->GetInfo();
+        if (InnerInfo.Type != PropertyType::Unknown) {
+            return UProperty::Info::Create(PropertyType::Container, sizeof(TArray<void*>), false, "TArray<" + InnerInfo.CppType + ">");
+        }
+    }
+
+    return { PropertyType::Unknown };
+}
+
+UProperty::Info UMapProperty::GetInfo() const
+{
+    UProperty* KeyProperty = GetKeyProperty();
+    UProperty* ValueProperty = GetValueProperty();
+    if (KeyProperty && ValueProperty) {
+        UProperty::Info KeyInfo = KeyProperty->GetInfo();
+        UProperty::Info ValueInfo = ValueProperty->GetInfo();
+        if (KeyInfo.Type != PropertyType::Unknown && ValueInfo.Type != PropertyType::Unknown) {
+            return UProperty::Info::Create(PropertyType::Container, sizeof(TMap<void*, void*>), false, "TMap<" + KeyInfo.CppType + ", " + ValueInfo.CppType + ">");
+        }
+    }
+
+    return { PropertyType::Unknown };
+}
+
+UProperty::Info UDelegateProperty::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FScriptDelegate), true, _XORSTR_("FScriptDelegate"));
+}
+
+UProperty::Info UMulticastDelegateProperty::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::PredefinedStruct, sizeof(FMulticastScriptDelegate), true, _XORSTR_("FMulticastScriptDelegate"));
+}
+
+UProperty::Info UEnumProperty::GetInfo() const
+{
+    return UProperty::Info::Create(PropertyType::Primitive, sizeof(uint8_t), false, fmt::MakeUniqueEnumCppName(GetEnum()));
+}
+

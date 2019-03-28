@@ -6,6 +6,14 @@
 extern "C" {
 #endif // __cplusplus
 
+// Simple min/max macros taken from the minwindef.h header.
+#ifndef __MAX
+#define __MAX(a,b)  (((a) > (b)) ? (a) : (b))
+#endif
+#ifndef __MIN
+#define __MIN(a,b)  (((a) < (b)) ? (a) : (b))
+#endif
+
 ///
 /// < RTL Heap API >
 ///
@@ -557,6 +565,20 @@ RtlDosSearchPath_U(
     IN ULONG Size,
     IN PWSTR Buffer,
     OUT PWSTR *PartName
+    );
+
+///
+/// < RTL Exception API >
+///
+
+NTRTLAPI
+void
+WINAPI
+RaiseException(
+    _In_ ULONG dwExceptionCode,
+    _In_ ULONG dwExceptionFlags,
+    _In_ ULONG nNumberOfArguments,
+    _In_ const ULONG_PTR *lpArguments
     );
 
 

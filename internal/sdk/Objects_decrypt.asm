@@ -10,15 +10,16 @@ DecryptObjectsAsm PROC
         sub     rsp, 8
         mov     rbp, rsp
 
-        mov     rax,rcx
-        shr     rcx,32
+        mov     QWORD PTR [rbp], 0
+        mov     eax,ecx
         xor     eax,067de73ebh
-        xor     ecx,0b45da658h
         sub     eax,035759deah
-        sub     ecx,036aa362ah
         xor     eax,0d05411fdh
-        xor     ecx,051f79072h
         mov     DWORD PTR [rbp],eax
+        shr     rcx,32
+        xor     ecx,0b45da658h
+        sub     ecx,36aa362ah
+        xor     ecx,51f79072h
         mov     DWORD PTR [rbp+4],ecx
         mov     rax,QWORD PTR [rbp]
 
@@ -119,12 +120,12 @@ DecryptObjectClassAsm PROC
         sub     rsp, 8
 ;       mov     rbp, rsp
 
-        mov     rdi, rcx                    ; RDI = ClassEncrypted
+        mov     rdi, rcx                ; RDI = ClassEncrypted
         mov     rax,0a73bef1e35b16a80h
         xor     rdi,rax
-        ror     rdi,20
+        ror     rdi,14h
         mov     rbx,rdi
-        shl     rbx,16
+        shl     rbx,32
         mov     rax,036afb043acad5969h
         xor     rbx,rax
         xor     rbx,rdi

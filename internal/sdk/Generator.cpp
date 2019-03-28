@@ -1,7 +1,7 @@
 #include "Generator.h"
-#include "Objects.h"
-#include "Properties.h"
 #include "Format.h"
+#include "Objects.h"
+#include "UnrealTypes.h"
 
 #include <native/log.h>
 #include <utils/xorstr.h>
@@ -117,7 +117,7 @@ bool ComparePropertyLess(const UProperty* lhs, const UProperty* rhs)
 void GeneratorPackage::GenerateEnum(const UEnum* Enum)
 {
     GeneratorEnum e;
-    e.Name = MakeUniqueCppName(Enum);
+    e.Name = fmt::MakeUniqueEnumCppName(Enum);
     if (e.Name.find(_XOR_("Default__")) != std::string::npos ||
         e.Name.find(_XOR_("PLACEHOLDER-CLASS")) != std::string::npos) {
         return;
@@ -128,7 +128,7 @@ void GeneratorPackage::GenerateEnum(const UEnum* Enum)
 
     std::unordered_map<std::string, int> conflicts;
     for (auto&& s : Enum->GetNames()) {
-        const auto clean = MakeValidName(std::move(s));
+        const auto clean = fmt::MakeValidName(std::move(s));
         const auto it = conflicts.find(clean);
         if (it == std::end(conflicts)) {
             e.Values.push_back(clean);
@@ -156,16 +156,16 @@ void GeneratorPackage::GenerateMethods(const UClass* ClassObj, std::vector<Gener
             GeneratorMethod m;
             m.Index = Function->GetUniqueId();
             m.FullName = Function->GetFullName();
-            m.Name = MakeValidName(Function->GetName());
+            m.Name = fmt::MakeValidName(Function->GetName());
 
             if (UniqueMethods.find(m.FullName) != std::end(UniqueMethods)) {
                 continue;
             }
             UniqueMethods.insert(m.FullName);
 
-            m.IsNative = Function->GetFunctionFlags() & FunctionFlags::Native;
-            m.IsStatic = Function->GetFunctionFlags() & FunctionFlags::Static;
-            m.FlagsString = StringifyFunctionFlags(Function->GetFunctionFlags());
+            m.IsNative = Function->GetFunctionFlags() & uint32_t(FunctionFlags::Native);
+            m.IsStatic = Function->GetFunctionFlags() & uint32_t(FunctionFlags::Static);
+            m.FlagsString = fmt::StringifyFunctionFlags(Function->GetFunctionFlags());
 
             std::vector<std::pair<UProperty*, GeneratorParameter>> Parameters;
 
@@ -187,7 +187,7 @@ void GeneratorPackage::GenerateMethods(const UClass* ClassObj, std::vector<Gener
                     }
 
                     p.PassByReference = false;
-                    p.Name = MakeValidName(Param->GetName());
+                    p.Name = fmt::MakeValidName(Param->GetName());
 
                     const auto it = Unique.find(p.Name);
                     if (it == std::end(Unique)) {
@@ -197,7 +197,7 @@ void GeneratorPackage::GenerateMethods(const UClass* ClassObj, std::vector<Gener
                         p.Name += tfm::format("%02d", it->second);
                     }
 
-                    p.FlagsString = StringifyPropertyFlags(Param->GetPropertyFlags());
+                    p.FlagsString = fmt::StringifyPropertyFlags(Param->GetPropertyFlags());
 
                     p.CppType = ParamInfo.CppType;
                     if (Param->IsA<UBoolProperty>()) {
@@ -273,7 +273,7 @@ void GeneratorPackage::GenerateMembers(const UStruct* Struct, int32_t Offset, co
             sp.Offset = Prop->GetOffset();
             sp.Size = PropInfo.Size;
             sp.Type = PropInfo.CppType;
-            sp.Name = MakeValidName(Prop->GetName());
+            sp.Name = fmt::MakeValidName(Prop->GetName());
 
             const auto it = UniqueMemberNames.find(sp.Name);
             if (it == std::end(UniqueMemberNames)) {
@@ -310,7 +310,7 @@ void GeneratorPackage::GenerateMembers(const UStruct* Struct, int32_t Offset, co
             }
 
             sp.Flags = Prop->GetPropertyFlags();
-            sp.FlagsString = StringifyPropertyFlags(sp.Flags);
+            sp.FlagsString = fmt::StringifyPropertyFlags(sp.Flags);
 
             Members.emplace_back(std::move(sp));
 
@@ -345,7 +345,7 @@ void GeneratorPackage::GenerateClass(const UClass* ClassObj)
 
     LOG_DBG_PRINT("Class:          %-98s - instance: 0x%p\n", c.FullName.c_str(), ClassObj);
 
-    c.NameCpp = MakeValidName(ClassObj->GetNameCPP());
+    c.NameCpp = fmt::MakeValidName(ClassObj->GetNameCPP());
     c.NameCppFull = _XORSTR_("class ") + c.NameCpp;
 
     c.Size = ClassObj->GetPropertiesSize();
@@ -356,7 +356,7 @@ void GeneratorPackage::GenerateClass(const UClass* ClassObj)
     UStruct* SuperStruct = ClassObj->GetSuper();
     if (SuperStruct && SuperStruct != ClassObj) {
         c.InheritedSize = offset = SuperStruct->GetPropertiesSize();
-        c.NameCppFull += _XORSTR_(" : public ") + MakeValidName(SuperStruct->GetNameCPP());
+        c.NameCppFull += _XORSTR_(" : public ") + fmt::MakeValidName(SuperStruct->GetNameCPP());
     }
 
     std::vector<GeneratorPredefinedMember> PredefinedStaticMembers;
@@ -523,7 +523,7 @@ void GeneratorPackage::GenerateScriptStruct(const UScriptStruct* ScriptStruct)
 
     LOG_DBG_PRINT("ScriptStruct: %-100s - instance: 0x%p\n", ss.Name.c_str(), ScriptStruct);
 
-    ss.NameCpp = MakeValidName(ScriptStruct->GetNameCPP());
+    ss.NameCpp = fmt::MakeValidName(ScriptStruct->GetNameCPP());
     ss.NameCppFull = _XORSTR_("struct ");
 
     // Some classes need special alignment
@@ -532,7 +532,7 @@ void GeneratorPackage::GenerateScriptStruct(const UScriptStruct* ScriptStruct)
         ss.NameCppFull += tfm::format(_XOR_("alignas(%d) "), Alignment);
     }
 
-    ss.NameCppFull += MakeUniqueCppName(static_cast<const UStruct*>(ScriptStruct));
+    ss.NameCppFull += fmt::MakeUniqueStructCppName(static_cast<const UStruct*>(ScriptStruct));
     ss.Size = ScriptStruct->GetPropertiesSize();
     ss.InheritedSize = 0;
 
@@ -540,7 +540,7 @@ void GeneratorPackage::GenerateScriptStruct(const UScriptStruct* ScriptStruct)
     const UStruct* SuperStruct = ScriptStruct->GetSuper();
     if (SuperStruct && SuperStruct != ScriptStruct) {
         ss.InheritedSize = Offset = SuperStruct->GetPropertiesSize();
-        ss.NameCppFull += _XORSTR_(" : public ") + MakeUniqueCppName(SuperStruct);
+        ss.NameCppFull += _XORSTR_(" : public ") + fmt::MakeUniqueStructCppName(SuperStruct);
     }
 
     std::vector<UProperty*> Props;
@@ -563,7 +563,7 @@ void GeneratorPackage::GenerateScriptStruct(const UScriptStruct* ScriptStruct)
     ScriptStructs.emplace_back(std::move(ss));
 }
 
-void GeneratorPackage::GenerateMemberPrerequisites(const UProperty* First, std::unordered_map<const UObject*, bool>& ProcessedObjects)
+void GeneratorPackage::GenerateMemberPrerequisites(UProperty const* First, std::unordered_map<UObject const*, bool>& ProcessedObjects)
 {
     UProperty* Prop = const_cast<UProperty*>(First);
     while (Prop) {
@@ -684,9 +684,14 @@ void GeneratorPackage::GeneratePrerequisites(const UObject* Obj, std::unordered_
     }
 }
 
+std::string GeneratorPackage::GetName() const
+{
+    return PackageObject->GetName();
+}
+
 void GeneratorPackage::Process(const ObjectsProxy& Objects, std::unordered_map<const UObject*, bool>& ProcessedObjects)
 {
-    for (UObject* Object : Objects) {
+    for (UObject const* Object : Objects) {
         if (Object) {
             const UPackage* Package = Object->GetOutermost();
             if (Package && Package == PackageObject) {
@@ -694,7 +699,7 @@ void GeneratorPackage::Process(const ObjectsProxy& Objects, std::unordered_map<c
                 if (Object->IsA<UEnum>()) {
 
                     //LOG_INFO("Processing enum \"%s\"...\n", Object->GetFullName().c_str());
-                    GenerateEnum(static_cast<UEnum*>(Object));
+                    GenerateEnum(static_cast<UEnum const*>(Object));
 
                 } else if (Object->IsA<UClass>()) {
 
@@ -1119,7 +1124,7 @@ void Generator::SaveSdkHeader(
         for (auto&& s : missing >> select([](auto&& kv) { return static_cast<const UStruct*>(kv.first); }) >> experimental::container()) {
             os2 << "// " << s->GetFullName() << _XORSTR_("\n// ");
             os2 << tfm::format("0x%04X\n", s->GetPropertiesSize());
-            os2 << _XORSTR_("struct ") << MakeValidName(s->GetNameCPP()) << "\n{\n";
+            os2 << _XORSTR_("struct ") << fmt::MakeValidName(s->GetNameCPP()) << "\n{\n";
             os2 << _XORSTR_("    uint8_t UnknownData[0x") << tfm::format("%X", s->GetPropertiesSize()) << _XORSTR_("];\n};\n\n");
         }
         PrintFileFooter(os2);

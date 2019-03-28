@@ -3,6 +3,13 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+#include <processenv.h>
+#include <processthreadsapi.h>
+#include <consoleapi.h>
+#include <debugapi.h>
+#include <sysinfoapi.h>
 
 // A size for log buffer in NonPagedPool. Two buffers are allocated with this
 // size. Exceeded logs are ignored silently. Make it bigger if a buffered log

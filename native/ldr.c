@@ -1,6 +1,8 @@
 #include "ldr.h"
 #include "rtl.h"
 
+#include <stdlib.h>
+
 /**
  * The default '.DLL' extension
  */

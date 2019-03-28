@@ -305,7 +305,7 @@ int DumpObjects()
         // Search for the beginning of the UObject::InternalIndexEncrypted decryption, which
         // is near the beginning within the first 10 instructions.
         /* mov     ebx, [rdx+28h] ; Object->InternalIndexEncrypted */
-        if (InstIndex < 10 &&
+        if (InstIndex < 12 &&
             Inst->opcode == I_MOV &&
             Inst->ops[0].type == O_REG &&
             Inst->ops[1].type == O_SMEM) {
@@ -358,7 +358,7 @@ int DumpObjects()
             /* cmp     qword ptr cs:aXenuinesdkCarv_159, r12 ; "XENUINESDK_CARVE"
              * jnz     short loc_7FF785416CE0
              */
-            if (Inst->opcode == I_CMP && NextInst->opcode == I_JNZ) {
+            if (Inst->opcode == I_CMP && META_GET_FC(NextInst->meta) == FC_CND_BRANCH) {
 
                 // We found the ending of the UObject::InternalIndexEncrypted decryption!
                 ObjectInternalIndexDecryptionEnd = Ip;

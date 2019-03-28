@@ -104,6 +104,8 @@ typedef struct _IN_STRING {
     BOOL fAllocated;
 } IN_STRING, *PIN_STRING;
 
+typedef LRESULT(CALLBACK* HOOKPROC)(int code, WPARAM wParam, LPARAM lParam);
+
 
 //
 // Win32k Routines

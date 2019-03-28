@@ -6,6 +6,7 @@
 #pragma warning(disable : 4005)
 #endif
 
+#include <malloc.h>
 #include <assert.h>
 
 #if defined(_MSC_VER)

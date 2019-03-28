@@ -7,11 +7,12 @@
 
 #include "sdk/Generator.h"
 #include "sdk/OffsetDumper.h"
+
 #include "Sdk.h"
 
-#define DUMP_ONLY 1
+#define DUMP_ONLY 0
 
-static HANDLE MainThread = INVALID_HANDLE_VALUE;
+static HANDLE MainThread = (HANDLE)(LONG_PTR)-1;
 
 static
 NTSTATUS
@@ -77,7 +78,7 @@ TestThreadRoutine(
     
         LOG_DEBUG(_XOR_("World address = 0x%016llx"), World.GetAddress());
         if (World.GetAddress()) {
-            if (++LoopCount > 5)
+            if (++LoopCount >= 10)
                 break;
         }
     
@@ -91,24 +92,20 @@ TestThreadRoutine(
         //LOG_INFO(_XOR_("NamesData1 = 0x%016llx"), NamesData[1]);
     }
 
-    UClass* UEnumStaticClass = Objects.FindClass("Class CoreUObject.Enum");
-    if (UEnumStaticClass) {
-        LOG_DEBUG(_XOR_("UEnumStaticClass = 0x%p"), UEnumStaticClass);
-    }
-
-    for (int32_t ObjectIdx = 0; ObjectIdx < Objects.GetNum(); ObjectIdx++) {
-        LOG_DEBUG(_XOR_("MADEIT0"));
-        UObject* Object = Objects.GetById(ObjectIdx);
-        LOG_DEBUG(_XOR_("MADEIT1"));
-        if (Object != nullptr) {
-            std::string FullName = Object->GetFullName();
-            LOG_DEBUG(_XOR_("MADEIT2"));
-            if (!FullName.empty()) {
-                uint32_t uniqueId = Object->GetUniqueId();
-                LOG_INFO(_XOR_("Object[%d] = %s"), uniqueId, FullName.c_str());
-            }
-        }
-    }
+    //UClass* UEnumStaticClass = Objects.FindClass("Class CoreUObject.Enum");
+    //if (UEnumStaticClass) {
+    //    LOG_DEBUG(_XOR_("UEnumStaticClass = 0x%p"), UEnumStaticClass);
+    //}
+    //for (int32_t ObjectIdx = 0; ObjectIdx < Objects.GetNum(); ObjectIdx++) {
+    //    UObject const* Object = Objects.GetById(ObjectIdx);
+    //    if (Object) {
+    //        std::string FullName = Object->GetFullName();
+    //        if (!FullName.empty()) {
+    //            uint32_t uniqueId = Object->GetUniqueId();
+    //            LOG_INFO(_XOR_("Object[%d] = %s"), uniqueId, FullName.c_str());
+    //        }
+    //    }
+    //}
 
 #if (DUMP_ONLY == 0)
     unreal::InitializeUnrealObjectSizeMap();
@@ -172,7 +169,7 @@ TestThreadRoutine(
         GeneratorPredefinedMethod::Inline(_XORSTR_(
     "    static UClass* FindClass(const std::string& Name)\n"
     "    {\n"
-    "        return FindObject<UClass>(Name);\n"
+    "        return FindObject<class UClass>(Name);\n"
     "    }"
         )),
         GeneratorPredefinedMethod::Inline(_XORSTR_(
@@ -194,34 +191,34 @@ TestThreadRoutine(
     "    return (uint32_t)DecryptObjectIndexAsm(InternalIndexEncrypted);\n"
     "}"
         )),
-        GeneratorPredefinedMethod::Default(_XORSTR_("class UClass* GetClass() const"), _XORSTR_(
-    "UClass* UObject::GetClass() const\n"
+        GeneratorPredefinedMethod::Default(_XORSTR_("class UClass const* GetClass() const"), _XORSTR_(
+    "UClass const* UObject::GetClass() const\n"
     "{\n"
-    "    return (UClass*)DecryptObjectClassAsm(ClassEncrypted);\n"
+    "    return (UClass const*)DecryptObjectClassAsm(ClassEncrypted);\n"
     "}"
         )),
-        GeneratorPredefinedMethod::Default(_XORSTR_("UObject *GetOuter() const"), _XORSTR_(
-    "UObject *UObject::GetOuter() const\n"
+        GeneratorPredefinedMethod::Default(_XORSTR_("class UObject const* GetOuter() const"), _XORSTR_(
+    "UObject const* UObject::GetOuter() const\n"
     "{\n"
-    "    return (UObject*)DecryptObjectOuterAsm(OuterEncrypted);\n"
+    "    return (UObject const*)DecryptObjectOuterAsm(OuterEncrypted);\n"
     "}"
         )),
         GeneratorPredefinedMethod::Default(_XORSTR_("FName GetFName() const"), _XORSTR_(
     "FName UObject::GetFName() const\n"
     "{\n"
-    "    int32_t Index, Number;\n"
-    "    DecryptObjectFNameAsm(NameIndexEncrypted, NameNumberEncrypted, &Index, &Number);\n"
-    "    return FName(Index, Number);\n"
+    "    FName Name;\n"
+    "    DecryptObjectFNameAsm(NameIndexEncrypted, NameNumberEncrypted, &Name.Index, &Name.Number);\n"
+    "    return Name;\n"
     "}"
         )),
-        GeneratorPredefinedMethod::Default(_XORSTR_("const class UPackage* GetOutermost() const"), _XORSTR_(
-    "const UPackage* UObject::GetOutermost() const\n"
+        GeneratorPredefinedMethod::Default(_XORSTR_("class UPackage const* GetOutermost() const"), _XORSTR_(
+    "UPackage const* UObject::GetOutermost() const\n"
     "{\n"
-    "    UObject* Top = NULL;\n"
-    "    for (UObject* Outer = GetOuter(); Outer; Outer = Outer->GetOuter()) {\n"
+    "    UObject const* Top = NULL;\n"
+    "    for (UObject const* Outer = GetOuter(); Outer; Outer = Outer->GetOuter()) {\n"
     "        Top = Outer;\n"
     "    }\n"
-    "    return static_cast<const UPackage*>(Top);\n"
+    "    return static_cast<UPackage const*>(Top);\n"
     "}"
         )),
         GeneratorPredefinedMethod::Default(_XORSTR_("std::string GetName() const"), _XORSTR_(
@@ -246,7 +243,7 @@ TestThreadRoutine(
     "    const UClass* Class = GetClass();\n"
     "    if (Class) {\n"
     "        std::string Temp;\n\n"
-    "        UObject* Outer = GetOuter();\n"
+    "        UObject const* Outer = GetOuter();\n"
     "        while(Outer) {\n"
     "            Temp = Outer->GetName() + '.' + Temp;\n"
     "            Outer = Outer->GetOuter();\n"
@@ -259,15 +256,40 @@ TestThreadRoutine(
     "    return NameString;\n"
     "}"
         )),
-        GeneratorPredefinedMethod::Default(_XORSTR_("bool IsA(UClass* CmpClass) const"), _XORSTR_(
-    "bool UObject::IsA(UClass* CmpClass) const\n"
+        GeneratorPredefinedMethod::Default(_XORSTR_("std::string GetNameCPP() const"), _XORSTR_(
+    "std::string UObject::GetNameCPP() const\n"
     "{\n"
-    "    UClass* SuperClass = GetClass();\n"
+    "    std::string NameString;\n"
+    "    if (IsA<UClass>()) {\n\n"
+    "        const UClass* Class = static_cast<const UClass*>(this);\n"
+    "        while (Class) {\n"
+    "            const std::string ClassName = Class->GetName();\n"
+    "            if (ClassName == \"Actor\") {\n"
+    "                NameString += 'A';\n"
+    "                break;\n"
+    "            }\n"
+    "            if (ClassName == \"Object\") {\n"
+    "                NameString += 'U';\n"
+    "                break;\n"
+    "            }\n"
+    "            Class = static_cast<const UClass*>(Class->GetSuper());\n"
+    "        }\n\n"
+    "    } else {\n"
+    "        NameString += 'F';\n"
+    "    }\n\n"
+    "    NameString += GetName();\n"
+    "    return NameString;\n"
+    "}"
+        )),
+        GeneratorPredefinedMethod::Default(_XORSTR_("bool IsA(class UClass const* CmpClass) const"), _XORSTR_(
+    "bool UObject::IsA(UClass const* CmpClass) const\n"
+    "{\n"
+    "    UClass const* SuperClass = GetClass();\n"
     "    while (SuperClass) {\n"
     "        if (SuperClass == CmpClass) {\n"
     "            return true;\n"
     "        }\n"
-    "        SuperClass = static_cast<UClass*>(SuperClass->GetSuper());\n"
+    "        SuperClass = static_cast<UClass const*>(SuperClass->GetSuper());\n"
     "    }\n"
     "    return false;\n"
     "}"
@@ -280,7 +302,7 @@ TestThreadRoutine(
     "    template<typename T>\n"
     "    inline T* Cast() { return static_cast<T*>(this); }\n"
     "    template<typename T>\n"
-    "    inline const T* Cast() const { return static_cast<const T*>(this); }"
+    "    inline T const* Cast() const { return static_cast<T const*>(this); }"
         ))
     });
 
@@ -309,8 +331,8 @@ TestThreadRoutine(
 
     Gen.AddPredefinedMethod(_XORSTR_("Class CoreUObject.Struct"), 
         GeneratorPredefinedMethod::Inline(_XORSTR_(
-    "    inline UStruct* GetSuper() const { return SuperStruct; }\n"
-    "    inline UField* GetChildren() const { return Children; }\n"
+    "    inline class UStruct* GetSuper() const { return SuperStruct; }\n"
+    "    inline class UField* GetChildren() const { return Children; }\n"
     "    inline int32_t GetPropertiesSize() const { return PropertiesSize; }\n"
     "    inline int32_t GetMinAlignment() const { return MinAlignment; }"
         ))
@@ -327,7 +349,7 @@ TestThreadRoutine(
     "    template<typename T>\n"
     "    inline T* CreateDefaultObject() { return static_cast<T*>(CreateDefaultObject()); }\n"
     "    template<typename T>\n"
-    "    inline const T* CreateDefaultObject() const { return static_cast<const T*>(CreateDefaultObject()); }"
+    "    inline T const* CreateDefaultObject() const { return static_cast<T const*>(CreateDefaultObject()); }"
         ))
     );
 
@@ -372,9 +394,9 @@ TestThreadRoutine(
                                   0x200,
                                   _XORSTR_("45 33 E4 4C 89 64 24 ?? 48 85 DB"),
         _XORSTR_(
-    "    inline UObject* CreateDefaultObject()\n"
+    "    inline class UObject* CreateDefaultObject()\n"
     "    {\n"
-    "        return utils::GetVFunction<UObject*(*)(UClass*)>(this, %d)(this);\n"
+    "        return utils::GetVFunction<class UObject*(*)(class UClass*)>(this, %d)(this);\n"
     "    }"));
 
     Gen.Generate();

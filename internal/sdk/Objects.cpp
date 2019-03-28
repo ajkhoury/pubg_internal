@@ -9,11 +9,62 @@
 
 std::unordered_map<std::string, int32_t> ObjectsProxy::ObjectsCacheMap;
 
-class TUObjectArray {
+class FFixedUObjectArray {
 public:
-    uint64_t ObjectsEncrypted; // 0x00 FUObjectItem *
-    int64_t MaxElements; // 0x08
-    int32_t NumElements; // 0x10
+    uint64_t ObjectsEncrypted;  // 0x00 FUObjectItem*
+    int64_t MaxElements;        // 0x08
+    int32_t NumElements;        // 0x10
+
+    inline FUObjectItem const* GetObjectPtr(int32_t Index) const
+    {
+        if (!IsValidIndex(Index)) {
+            return nullptr;
+        }
+        FUObjectItem const* Objects = (FUObjectItem const*)DecryptObjectsAsm(ObjectsEncrypted);
+        return &Objects[Index];
+    }
+
+    inline FUObjectItem* GetObjectPtr(int32_t Index)
+    {
+        if (!IsValidIndex(Index)) {
+            return nullptr;
+        }
+        FUObjectItem* Objects = (FUObjectItem*)DecryptObjectsAsm(ObjectsEncrypted);
+        return &Objects[Index];
+    }
+
+    /**
+    * Return the number of elements in the array
+    * Thread safe, but you know, someone might have added more elements before this even returns
+    * @return   the number of elements in the array
+    **/
+    inline int32_t Num() const { return NumElements; }
+
+    /**
+    * Return if this index is valid
+    * Thread safe, if it is valid now, it is valid forever. Other threads might be adding during this call.
+    * @param    Index   Index to test
+    * @return   true, if this is a valid
+    **/
+    inline bool IsValidIndex(int32_t Index) const { return Index < Num() && Index >= 0; }
+
+    ///**
+    //* Return a reference to an element
+    //* @param    Index   Index to return
+    //* @return   a reference to the pointer to the element
+    //* Thread safe, if it is valid now, it is valid forever. This might return nullptr, but by then, some other thread might have made it non-nullptr.
+    //**/
+    //inline FUObjectItem const& operator[](int32_t Index) const
+    //{
+    //    FUObjectItem const* ItemPtr = GetObjectPtr(Index);
+    //    return *ItemPtr;
+    //}
+    //
+    //inline FUObjectItem& operator[](int32_t Index)
+    //{
+    //    FUObjectItem* ItemPtr = GetObjectPtr(Index);
+    //    return *ItemPtr;
+    //}
 };
 
 class FUObjectArray {
@@ -23,7 +74,7 @@ public:
     int32_t MaxObjectsNotConsideredByGC; // 0x08
     bool OpenForDisregardForGC; // 0x0C
 
-    TUObjectArray ObjObjects; // 0x10
+    FFixedUObjectArray ObjObjects; // 0x10
 
     FCriticalSection ObjObjectsCritical; // 0x28
     FThreadSafeCounter ObjAvailableCount; // 0x50
@@ -91,7 +142,7 @@ ObjectsProxy::ObjectsProxy()
 
 int32_t ObjectsProxy::GetNum() const
 {
-    return static_cast<FUObjectArray *>(ObjectArray)->ObjObjects.NumElements;
+    return static_cast<FUObjectArray *>(ObjectArray)->ObjObjects.Num();
 }
 
 int64_t ObjectsProxy::GetMax() const
@@ -104,34 +155,64 @@ FUObjectItem *ObjectsProxy::GetObjectsPrivate() const
     union CryptValue ObjectsDecrypted;
     uint64_t ObjectsEncrypted = static_cast<FUObjectArray *>(ObjectArray)->ObjObjects.ObjectsEncrypted;
 
+    LOG_DEBUG(_XOR_("ObjectsEncrypted = 0x%p"), (void*)ObjectsEncrypted);
+
     ObjectsDecrypted.Qword = DecryptObjectsAsm(ObjectsEncrypted);
 
-    return (FUObjectItem *)ObjectsDecrypted.Pointer;
+    LOG_DEBUG(_XOR_("ObjectsDecrypted = 0x%p"), ObjectsDecrypted.Pointer);
+
+    return static_cast<FUObjectItem *>(ObjectsDecrypted.Pointer);
 }
 
-UObject *ObjectsProxy::GetById(int32_t Index) const
+
+UObject const* ObjectsProxy::GetById(int32_t Index) const
 {
-    union CryptValue ObjectsDecrypted;
-    uint64_t ObjectsEncrypted = static_cast<FUObjectArray *>(ObjectArray)->ObjObjects.ObjectsEncrypted;
-
-    ObjectsDecrypted.Qword = DecryptObjectsAsm(ObjectsEncrypted);
-
-    FUObjectItem *Objects = static_cast<FUObjectItem *>(ObjectsDecrypted.Pointer);
-
-    return Objects[Index].Object;
+    FUObjectItem const* Object = static_cast<FUObjectArray*>(ObjectArray)->ObjObjects.GetObjectPtr(Index);
+    if (!Object) {
+        return nullptr;
+    }
+    return Object->Object;
 }
 
-UObject* ObjectsProxy::FindObject(const std::string& name) const
+UObject* ObjectsProxy::GetById(int32_t Index)
+{
+    FUObjectItem const* Object = static_cast<FUObjectArray*>(ObjectArray)->ObjObjects.GetObjectPtr(Index);
+    if (!Object) {
+        return nullptr;
+    }
+    return Object->Object;
+}
+
+UObject* ObjectsProxy::FindObject(const std::string& name)
 {
     for (int32_t i = 0; i < GetNum(); ++i) {
         UObject* Object = GetById(i);
-        if (Object != nullptr) {
-            if (Object->GetFullName() == name) {
-                return Object;
-            }
+        if (Object && Object->GetFullName() == name) {
+            return Object;
         }
     }
     return NULL;
+}
+
+UObject const* ObjectsProxy::FindObject(const std::string& name) const
+{
+    for (int32_t i = 0; i < GetNum(); ++i) {
+        UObject const* Object = GetById(i);
+        if (Object && Object->GetFullName() == name) {
+            return Object;
+        }
+    }
+    return NULL;
+}
+
+UClass* ObjectsProxy::FindClass(const std::string& Name)
+{
+    return static_cast<UClass*>(FindObject(Name));
+}
+
+UClass const* ObjectsProxy::FindClass(const std::string& Name) const
+{
+    return static_cast<UClass const*>(FindObject(Name));
 }
 
 int32_t ObjectsProxy::CountObjects(const UClass* CmpClass, const std::string& Name) const
@@ -143,11 +224,9 @@ int32_t ObjectsProxy::CountObjects(const UClass* CmpClass, const std::string& Na
 
     int32_t Count = 0;
     for (int32_t i = 0; i < GetNum(); ++i) {
-        UObject* Object = GetById(i);
-        if (Object) {
-            if (Object->IsA(CmpClass) && Object->GetName() == Name) {
-                ++Count;
-            }
+        UObject const* Object = GetById(i);
+        if (Object && Object->IsA(CmpClass) && Object->GetName() == Name) {
+            ++Count;
         }
     }
 

@@ -154,7 +154,7 @@ RtlCompareUnicodeStrings(
 )
 {
     LONG Result = 0;
-    ULONG Length = min(Length1, Length2) / sizeof(WCHAR);
+    ULONG Length = __MIN(Length1, Length2) / sizeof(WCHAR);
     PWCHAR Str1 = String1;
     PWCHAR Str2 = String2;
 

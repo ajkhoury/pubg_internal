@@ -321,6 +321,21 @@
     <ClCompile Include="sdk\gen\PUBG_BP_OutSideTeamIconWidget_functions.cpp">
       <Filter>internal\sdk\gen</Filter>
     </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_BP_PcOptionCategoryGroupWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_BP_PcOptionDetailWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_BP_PcOptionInputBlockerWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_BP_PcOptionItemDropDownListSelectableWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_BP_PcOptionItemDropDownListWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
     <ClCompile Include="sdk\gen\PUBG_BP_PcOptionItemSliderWidget_functions.cpp">
       <Filter>internal\sdk\gen</Filter>
     </ClCompile>
@@ -334,6 +349,33 @@
       <Filter>internal\sdk\gen</Filter>
     </ClCompile>
     <ClCompile Include="sdk\gen\PUBG_BP_PcOptionKeyBinderWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_BP_PcOptionSupplementaryMicrophoneVolumeUnitMeterWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_BP_PcOptionSupplementaryPreviewCrosshairWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_BP_PcOptionSupplementaryPreviewImageWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_BP_PcOptionTabContentsWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_BP_PcOptionTabLabelWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_BP_PcOptionTabSelectorWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_BP_PcOptionWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_BP_PcSystemMenuButtonWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_BP_PcSystemMenuWidget_functions.cpp">
       <Filter>internal\sdk\gen</Filter>
     </ClCompile>
     <ClCompile Include="sdk\gen\PUBG_BP_PP_OutlineCustomDepthOcclusion_Inst_functions.cpp">
@@ -831,6 +873,9 @@
     <ClCompile Include="sdk\gen\PUBG_NewLobbySystemMenuWidget_functions.cpp">
       <Filter>internal\sdk\gen</Filter>
     </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_NewWorldMapWidget_BP_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
     <ClCompile Include="sdk\gen\PUBG_NewWorldMapWidget_functions.cpp">
       <Filter>internal\sdk\gen</Filter>
     </ClCompile>
@@ -907,6 +952,15 @@
       <Filter>internal\sdk\gen</Filter>
     </ClCompile>
     <ClCompile Include="sdk\gen\PUBG_QualitySliderWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_RealtimeMissionCompleteWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_RealtimeMissionItemWidget_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_RealtimeMissionListWidget_functions.cpp">
       <Filter>internal\sdk\gen</Filter>
     </ClCompile>
     <ClCompile Include="sdk\gen\PUBG_RenderTimePoint_functions.cpp">
@@ -1053,6 +1107,12 @@
     <ClCompile Include="sdk\gen\PUBG_TslLobby_cus_functions.cpp">
       <Filter>internal\sdk\gen</Filter>
     </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_TslLobby_Seasonpass0327_lobby_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\gen\PUBG_TslLobby_Seasonpass0327_main_functions.cpp">
+      <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
     <ClCompile Include="sdk\gen\PUBG_TslLobby_v3_functions.cpp">
       <Filter>internal\sdk\gen</Filter>
     </ClCompile>
@@ -1148,6 +1208,9 @@
     </ClCompile>
     <ClCompile Include="sdk\gen\PUBG_ZipUtility_functions.cpp">
       <Filter>internal\sdk\gen</Filter>
+    </ClCompile>
+    <ClCompile Include="sdk\Format.cpp">
+      <Filter>internal\sdk</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1253,9 +1316,6 @@
     <ClInclude Include="sdk\World.h">
       <Filter>internal\sdk</Filter>
     </ClInclude>
-    <ClInclude Include="sdk\Properties.h">
-      <Filter>internal\sdk</Filter>
-    </ClInclude>
     <ClInclude Include="sdk\Generator.h">
       <Filter>internal\sdk</Filter>
     </ClInclude>
@@ -1281,6 +1341,9 @@
       <Filter>internal\sdk</Filter>
     </ClInclude>
     <ClInclude Include="sdk\Encryption.h">
+      <Filter>internal\sdk</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\EnumClassFlags.h">
       <Filter>internal\sdk</Filter>
     </ClInclude>
     <ClInclude Include="sdk\gen\PUBG_ABP_Sawnoff_classes.h">
@@ -1793,6 +1856,36 @@
     <ClInclude Include="sdk\gen\PUBG_BP_OutSideTeamIconWidget_structs.h">
       <Filter>internal\sdk\gen</Filter>
     </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionCategoryGroupWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionCategoryGroupWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionDetailWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionDetailWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionInputBlockerWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionInputBlockerWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionItemDropDownListSelectableWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionItemDropDownListSelectableWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionItemDropDownListWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionItemDropDownListWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
     <ClInclude Include="sdk\gen\PUBG_BP_PcOptionItemSliderWidget_classes.h">
       <Filter>internal\sdk\gen</Filter>
     </ClInclude>
@@ -1821,6 +1914,60 @@
       <Filter>internal\sdk\gen</Filter>
     </ClInclude>
     <ClInclude Include="sdk\gen\PUBG_BP_PcOptionKeyBinderWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionSupplementaryMicrophoneVolumeUnitMeterWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionSupplementaryMicrophoneVolumeUnitMeterWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionSupplementaryPreviewCrosshairWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionSupplementaryPreviewCrosshairWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionSupplementaryPreviewImageWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionSupplementaryPreviewImageWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionTabContentsWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionTabContentsWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionTabLabelWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionTabLabelWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionTabSelectorWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionTabSelectorWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcOptionWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcSystemMenuButtonWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcSystemMenuButtonWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcSystemMenuWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_BP_PcSystemMenuWidget_structs.h">
       <Filter>internal\sdk\gen</Filter>
     </ClInclude>
     <ClInclude Include="sdk\gen\PUBG_BP_PP_OutlineCustomDepthOcclusion_Inst_classes.h">
@@ -2813,6 +2960,12 @@
     <ClInclude Include="sdk\gen\PUBG_NewLobbySystemMenuWidget_structs.h">
       <Filter>internal\sdk\gen</Filter>
     </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_NewWorldMapWidget_BP_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_NewWorldMapWidget_BP_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
     <ClInclude Include="sdk\gen\PUBG_NewWorldMapWidget_classes.h">
       <Filter>internal\sdk\gen</Filter>
     </ClInclude>
@@ -2967,6 +3120,24 @@
       <Filter>internal\sdk\gen</Filter>
     </ClInclude>
     <ClInclude Include="sdk\gen\PUBG_QualitySliderWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_RealtimeMissionCompleteWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_RealtimeMissionCompleteWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_RealtimeMissionItemWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_RealtimeMissionItemWidget_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_RealtimeMissionListWidget_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_RealtimeMissionListWidget_structs.h">
       <Filter>internal\sdk\gen</Filter>
     </ClInclude>
     <ClInclude Include="sdk\gen\PUBG_RenderTimePoint_classes.h">
@@ -3257,6 +3428,18 @@
     <ClInclude Include="sdk\gen\PUBG_TslLobby_cus_structs.h">
       <Filter>internal\sdk\gen</Filter>
     </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_TslLobby_Seasonpass0327_lobby_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_TslLobby_Seasonpass0327_lobby_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_TslLobby_Seasonpass0327_main_classes.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\gen\PUBG_TslLobby_Seasonpass0327_main_structs.h">
+      <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
     <ClInclude Include="sdk\gen\PUBG_TslLobby_v3_classes.h">
       <Filter>internal\sdk\gen</Filter>
     </ClInclude>
@@ -3448,6 +3631,9 @@
     </ClInclude>
     <ClInclude Include="sdk\gen\PUBG_ZipUtility_structs.h">
       <Filter>internal\sdk\gen</Filter>
+    </ClInclude>
+    <ClInclude Include="sdk\PUBG_SDK.h">
+      <Filter>internal\sdk</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
