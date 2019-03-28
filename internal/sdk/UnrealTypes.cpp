@@ -70,17 +70,23 @@ std::string UObject::GetFullName() const
 {
     std::string NameString;
     const UClass* Class = GetClass();
+    LOG_DEBUG(_XOR_("MADEIT1.1"));
     if (Class) {
         std::string Temp;
         UObject* Outer = GetOuter();
+        LOG_DEBUG(_XOR_("MADEIT1.2"));
         while (Outer) {
             Temp = Outer->GetName() + '.' + Temp;
+            LOG_DEBUG(_XOR_("MADEIT1.3"));
             Outer = Outer->GetOuter();
         }
+        LOG_DEBUG(_XOR_("MADEIT1.4"));
         NameString = Class->GetName();
+        LOG_DEBUG(_XOR_("MADEIT1.5"));
         NameString += ' ';
         NameString += Temp;
         NameString += GetName();
+        LOG_DEBUG(_XOR_("MADEIT1.6"));
     }
     return NameString;
 }

@@ -10,7 +10,7 @@ DecryptObjectsAsm PROC
         sub     rsp, 8
         mov     rbp, rsp
 
-        mov     eax,ecx
+        mov     rax,rcx
         shr     rcx,32
         xor     eax,067de73ebh
         xor     ecx,0b45da658h

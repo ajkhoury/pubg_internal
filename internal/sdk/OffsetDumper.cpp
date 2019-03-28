@@ -1495,12 +1495,12 @@ int DumpNames()
     }
     LOG_INFO(_XOR_("Found the FName::InitInternal_FindOrAddNameEntry signature: 0x%p"), Found);
 
-    LOG_INFO(_XOR_("FName::InitInternal_FindOrAddNameEntry instruction bytes = {"));
-    std::string bufstr = utils::FormatBuffer(Found, 1024);
-    for (auto line : utils::SplitString(bufstr, '\n')) {
-        LOG_INFO(_XOR_("%s"), line.c_str());
-    }
-    LOG_INFO(_XOR_("};"));
+    //LOG_INFO(_XOR_("FName::InitInternal_FindOrAddNameEntry instruction bytes = {"));
+    //std::string bufstr = utils::FormatBuffer(Found, 1024);
+    //for (auto line : utils::SplitString(bufstr, '\n')) {
+    //    LOG_INFO(_XOR_("%s"), line.c_str());
+    //}
+    //LOG_INFO(_XOR_("};"));
 
     // Disassemble the FName::InitInternal_FindOrAddNameEntry routine.
     rc = DisDecompose(Found,
@@ -2099,7 +2099,7 @@ int DumpWorld()
     // .text:7FF6FC3954DB 48 39 35 1E 7C 04 03      cmp     qword ptr cs:aXenuinesdkCarv_97, rsi ; "XENUINESDK_CARVE"
     // .text:7FF6FC3954E2 75 10                     jnz     short loc_7FF6FC3954F4
     // 48 8B D9 48 8B 05 ? ? ? ? 48 89 84 24 ? ? ? ? 33 F6
-    Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("48 8B 05 ?? ?? ?? ?? 48 89 84 24 ?? ?? ?? ?? 33 F6"));
+    Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("48 8B D9 48 8B 05 ?? ?? ?? ?? 48 89 84 24"));
     if (!Found) {
         LOG_ERROR(_XOR_("Failed to find GWorld decryption signature!"));
         return ERROR_NOT_FOUND;
@@ -2138,7 +2138,7 @@ int DumpWorld()
         /* mov     rax, cs:GWorld */
         /* mov     [rsp+80h], rax  */
         /* xor     esi, esi  */
-        if (InstIndex == 0 &&
+        if (InstIndex == 1 &&
             Inst->opcode == I_MOV &&
             Inst->ops[1].type == O_SMEM &&
             NextInst->opcode == I_MOV &&

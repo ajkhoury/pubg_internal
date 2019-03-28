@@ -35,7 +35,7 @@ static bool WorldInitializeGlobal()
     // .text:7FF6FC3954E2 75 10                     jnz     short loc_7FF6FC3954F4
     // 48 8B D9 48 8B 05 ? ? ? ? 48 89 84 24 ? ? ? ? 33 F6
     const uint8_t *Found;
-    do Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("48 8B D9 48 8B 05 ?? ?? ?? ?? 48 89 84 24 ?? ?? ?? ?? 33 F6"));
+    do Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("48 8B D9 48 8B 05 ?? ?? ?? ?? 48 89 84 24"));
     while (!Found);
     
     GWorldEncrypted = static_cast<uint64_t*>(utils::GetInstructionTarget(Found, 3 + 3));

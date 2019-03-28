@@ -9,7 +9,7 @@
 #include "sdk/OffsetDumper.h"
 #include "Sdk.h"
 
-#define DUMP_ONLY 0
+#define DUMP_ONLY 1
 
 static HANDLE MainThread = INVALID_HANDLE_VALUE;
 
@@ -44,7 +44,7 @@ TestThreadRoutine(
     }
 #endif // DUMP_ONLY
 
-#if !DUMP_ONLY
+
     NamesProxy Names;
     if (!Names.GetAddress()) {
         LOG_ERROR(_XOR_("Failed to initialize Names!"));
@@ -91,22 +91,26 @@ TestThreadRoutine(
         //LOG_INFO(_XOR_("NamesData1 = 0x%016llx"), NamesData[1]);
     }
 
-    //ClassProxy UEnumStatic = Objects.FindClass("Class CoreUObject.Enum");
-    //if (UEnumStatic.IsValid()) {
-    //    LOG_DEBUG(_XOR_("UEnumStatic = 0x%p"), UEnumStatic.GetAddress());
-    //}
+    UClass* UEnumStaticClass = Objects.FindClass("Class CoreUObject.Enum");
+    if (UEnumStaticClass) {
+        LOG_DEBUG(_XOR_("UEnumStaticClass = 0x%p"), UEnumStaticClass);
+    }
 
-    //for (int32_t ObjectIdx = 0; ObjectIdx < Objects.GetNum(); ObjectIdx++) {
-    //    ObjectProxy Object = Objects.GetById(ObjectIdx);
-    //    if (Object.IsValid()) {
-    //        auto FullName = Object.GetFullName();
-    //        if (!FullName.empty()) {
-    //            uint32_t uniqueId = Object.GetUniqueId();
-    //            LOG_INFO(_XOR_("Object[%d] = %s"), uniqueId, FullName.c_str());
-    //        }
-    //    }
-    //}
+    for (int32_t ObjectIdx = 0; ObjectIdx < Objects.GetNum(); ObjectIdx++) {
+        LOG_DEBUG(_XOR_("MADEIT0"));
+        UObject* Object = Objects.GetById(ObjectIdx);
+        LOG_DEBUG(_XOR_("MADEIT1"));
+        if (Object != nullptr) {
+            std::string FullName = Object->GetFullName();
+            LOG_DEBUG(_XOR_("MADEIT2"));
+            if (!FullName.empty()) {
+                uint32_t uniqueId = Object->GetUniqueId();
+                LOG_INFO(_XOR_("Object[%d] = %s"), uniqueId, FullName.c_str());
+            }
+        }
+    }
 
+#if (DUMP_ONLY == 0)
     unreal::InitializeUnrealObjectSizeMap();
 
     Generator Gen(_XOR_("F:\\Projects\\nvdid\\internal\\sdk"), true, true);
