@@ -254,7 +254,7 @@ public:
 public:
     // Public static fields.
     static std::unordered_map<class UPackage const*, const GeneratorPackage*> PackageMap;
-    static std::unordered_map<std::string, int32_t> AlignasClasses;
+    static std::unordered_map<std::string, uint32_t> AlignasClasses;
 
     // Gets alignas size for the specific class.
     static inline size_t GetClassAlignas(const std::string& name)

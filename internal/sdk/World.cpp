@@ -4,14 +4,27 @@
 #include <utils/utils.h>
 #include <utils/xorstr.h>
 
+#include "../Sdk.h"
+
 static uint64_t *GWorldEncrypted = NULL;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 uint64_t DecryptWorldAsm(uint64_t WorldEncrypted);
+uint64_t DecryptCurrentLevelAsm(uint64_t CurrentLevelEncrypted);
+
 #ifdef __cplusplus
 }
+#endif
+
+#if !defined(ENABLE_SDK)
+class UWorld : public UObject {
+public:
+    class ULevel* CurrentLevel;
+};
+class ULevel : public UObject {};
 #endif
 
 static bool WorldInitializeGlobal()
@@ -49,11 +62,10 @@ WorldProxy::WorldProxy()
     if (!GWorldEncrypted) {
         WorldInitializeGlobal();
     }
-    
     WorldEncryptedPtr = GWorldEncrypted;
 }
 
-void *WorldProxy::GetAddress() const
+const void* WorldProxy::GetAddress() const
 {
     union CryptValue WorldDecrypted;
     uint64_t WorldEncrypted = *WorldEncryptedPtr;
@@ -63,6 +75,17 @@ void *WorldProxy::GetAddress() const
     //LOG_INFO(_XOR_("WorldDecrypted = 0x%016llx"), WorldDecrypted.Qword);
 
     return WorldDecrypted.Pointer;
+}
+
+ULevel* WorldProxy::GetCurrentLevel()
+{
+    UWorld* World = GetPtr();
+    if (World) {
+        CryptValue CurrentLevelDecrypted;
+        CurrentLevelDecrypted.Qword = DecryptCurrentLevelAsm(reinterpret_cast<uint64_t>(World->CurrentLevel));
+        return static_cast<ULevel*>(CurrentLevelDecrypted.Pointer);
+    }
+    return nullptr;
 }
 
 

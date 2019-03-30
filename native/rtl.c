@@ -1,6 +1,7 @@
 #include "rtl.h"
 
 #include <intrin.h>
+#include <stdlib.h>
 
 ///
 /// < RTL Heap API Implementation >

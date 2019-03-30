@@ -2,6 +2,8 @@
 
 #include "Types.h"
 
+#include <array>
+
 // Forwarded types
 class UObject;
 class UClass;
@@ -53,6 +55,11 @@ public:
     inline const T* Cast() const { return static_cast<const T*>(this); }
     template<typename T>
     inline T* Cast() { return static_cast<T*>(this); }
+
+    template<typename T>
+    inline const T& CastRef() const { return *static_cast<const T*>(this); }
+    template<typename T>
+    inline T& CastRef() { return *static_cast<T*>(this); }
 
     DECLARE_STATIC_CLASS(Object);
 
@@ -209,11 +216,11 @@ public:
 
     struct Info {
         PropertyType Type;
-        int32_t Size;
+        uint32_t Size;
         bool CanBeReference;
         std::string CppType;
 
-        static Info Create(PropertyType Type, int32_t Size, bool bCanBeReference, std::string&& CppType)
+        static Info Create(PropertyType Type, uint32_t Size, bool bCanBeReference, std::string&& CppType)
         {
             Info NewInfo;
             NewInfo.Type = Type;
@@ -390,20 +397,28 @@ public:
     inline uint8_t GetByteMask() const { return ByteMask; }
     inline uint8_t GetFieldMask() const { return FieldMask; }
 
-    inline bool IsNativeBool() const { return GetFieldMask() == 0xFF; }
-    inline bool IsBitfield() const { return !IsNativeBool(); }
-
-    UProperty::Info GetInfo() const;
+    bool IsNativeBool() const { return GetFieldMask() == 0xFF; }
+    bool IsBitfield() const { return !IsNativeBool(); }
 
     struct MissingBitsCount {
-        int bits0, bits1;
+        int Count0, Count1;
         inline int const& operator[](int32_t Index) const { return *((int *)this + Index); }
         inline int& operator[](int32_t Index) { return *((int *)this + Index); }
     };
     MissingBitsCount GetMissingBitsCount(const UBoolProperty* Other) const;
 
+    UProperty::Info GetInfo() const;
+
     DECLARE_STATIC_CLASS(BoolProperty);
 };
+
+inline bool operator<(const UBoolProperty& lhs, const UBoolProperty& rhs)
+{
+    if (lhs.GetByteOffset() == rhs.GetByteOffset())
+        return lhs.GetByteMask() < rhs.GetByteMask();
+    return lhs.GetByteOffset() < rhs.GetByteOffset();
+}
+
 
 class UObjectPropertyBase : public UProperty {
 public:

@@ -59,7 +59,7 @@ TestThreadRoutine(
     }
     
     WorldProxy World;
-    if (!World.GetEncryptedPointerAddress()) {
+    if (!World.GetEncryptedPtr()) {
         LOG_ERROR(_XOR_("Failed to initialize World!"));
         return STATUS_UNSUCCESSFUL;
     }
@@ -91,6 +91,25 @@ TestThreadRoutine(
         //LOG_INFO(_XOR_("NamesData0 = 0x%016llx"), NamesData[0]);
         //LOG_INFO(_XOR_("NamesData1 = 0x%016llx"), NamesData[1]);
     }
+
+#if defined(ENABLE_SDK)
+    while(TRUE) {
+    
+        WaitInterval.QuadPart = INTERVAL_RELATIVE(MILLISECONDS(800));
+        NtDelayExecution(FALSE, &WaitInterval);
+    
+        ULevel* CurrentLevel = World.GetCurrentLevel();
+        if (CurrentLevel) {
+            LOG_INFO(_XOR_("ActorCluster = 0x%p"), CurrentLevel->ActorCluster);
+            LOG_INFO(_XOR_("WorldSettings = 0x%p"), CurrentLevel->WorldSettings);
+            LOG_INFO(_XOR_("NavListEnd = 0x%p"), CurrentLevel->NavListEnd);
+            LOG_INFO(_XOR_("ActorCluster = 0x%p"), CurrentLevel->ActorCluster);
+            LOG_INFO(_XOR_("ActorCluster = 0x%p"), CurrentLevel->ActorCluster);
+            LOG_INFO(_XOR_("ActorCluster = 0x%p"), CurrentLevel->ActorCluster);
+            LOG_INFO(_XOR_("AssetUserData = 0x%p"), CurrentLevel->AssetUserData.GetData());
+        }
+    }
+#endif // ENABLE_SDK
 
     //UClass* UEnumStaticClass = Objects.FindClass("Class CoreUObject.Enum");
     //if (UEnumStaticClass) {

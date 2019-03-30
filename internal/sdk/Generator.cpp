@@ -11,7 +11,7 @@ using namespace cpplinq;
 
 // Public static fields of Generator.
 std::unordered_map<const UPackage*, const GeneratorPackage*> Generator::PackageMap;
-std::unordered_map<std::string, int32_t> Generator::AlignasClasses = {
+std::unordered_map<std::string, uint32_t> Generator::AlignasClasses = {
     { "ScriptStruct CoreUObject.Plane", 16 },
     { "ScriptStruct CoreUObject.Quat", 16 },
     { "ScriptStruct CoreUObject.Transform", 16 },
@@ -102,15 +102,10 @@ bool GeneratorParameter::MakeType(const uint64_t flags, GeneratorParameter::Type
 
 bool ComparePropertyLess(const UProperty* lhs, const UProperty* rhs)
 {
-    if (!lhs || !rhs) {
-        return lhs == rhs;
-    }
-
     if (lhs->GetOffset() == rhs->GetOffset() &&
         lhs->IsA<UBoolProperty>() && rhs->IsA<UBoolProperty>()) {
-        return lhs->Cast<UBoolProperty>() < rhs->Cast<UBoolProperty>();
+        return lhs->CastRef<UBoolProperty>() < rhs->CastRef<UBoolProperty>();
     }
-
     return lhs->GetOffset() < rhs->GetOffset();
 }
 
@@ -233,23 +228,23 @@ void GeneratorPackage::GenerateMethods(const UClass* ClassObj, std::vector<Gener
     }
 }
 
-GeneratorMember CreatePadding(size_t id, int32_t offset, int32_t size, std::string reason)
+GeneratorMember CreatePadding(size_t Id, uint32_t Offset, uint32_t Size, std::string Reason)
 {
     GeneratorMember m;
-    m.Name = tfm::format(_XOR_("UnknownData%02d[0x%X]"), id, size);
+    m.Name = tfm::format(_XOR_("UnknownData%02d[0x%X]"), Id, Size);
     m.Type = _XORSTR_("uint8_t");
-    m.Offset = offset;
-    m.Size = size;
-    m.Comment = std::move(reason);
+    m.Offset = Offset;
+    m.Size = Size;
+    m.Comment = std::move(Reason);
     return m;
 }
 
-GeneratorMember CreateBitfieldPadding(size_t id, int32_t offset, std::string type, size_t bits)
+GeneratorMember CreateBitfieldPadding(size_t Id, uint32_t Offset, std::string Type, int BitsCount)
 {
     GeneratorMember m;
-    m.Name = tfm::format(_XOR_("UnknownData%02d : %d"), id, bits);
-    m.Type = std::move(type);
-    m.Offset = offset;
+    m.Name = tfm::format(_XOR_("UnknownData%02d : %d"), Id, BitsCount);
+    m.Type = std::move(Type);
+    m.Offset = Offset;
     m.Size = 1;
     return m;
 }
@@ -261,18 +256,19 @@ void GeneratorPackage::GenerateMembers(const UStruct* Struct, int32_t Offset, co
     UBoolProperty* PreviousBitfieldProperty = nullptr;
 
     for (auto&& Prop : Props) {
+
         if (Offset < Prop->GetOffset()) {
             PreviousBitfieldProperty = nullptr;
-            const int32_t size = Prop->GetOffset() - Offset;
+            const auto size = Prop->GetOffset() - Offset;
             Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, size, _XORSTR_("MISSED OFFSET")));
         }
 
-        const UProperty::Info PropInfo = Prop->GetInfo();
-        if (PropInfo.Type != UProperty::PropertyType::Unknown) {
+        const auto Info = Prop->GetInfo();
+        if (Info.Type != UProperty::PropertyType::Unknown) {
             GeneratorMember sp;
             sp.Offset = Prop->GetOffset();
-            sp.Size = PropInfo.Size;
-            sp.Type = PropInfo.CppType;
+            sp.Size = Info.Size;
+            sp.Type = Info.CppType;
             sp.Name = fmt::MakeValidName(Prop->GetName());
 
             const auto it = UniqueMemberNames.find(sp.Name);
@@ -292,13 +288,13 @@ void GeneratorPackage::GenerateMembers(const UStruct* Struct, int32_t Offset, co
                 const auto MissingBits = BoolProp->GetMissingBitsCount(PreviousBitfieldProperty);
                 if (MissingBits[1] != -1) {
                     if (MissingBits[0] > 0) {
-                        Members.emplace_back(CreateBitfieldPadding(UnknownDataCounter++, PreviousBitfieldProperty->GetOffset(), PropInfo.CppType, MissingBits[0]));
+                        Members.emplace_back(CreateBitfieldPadding(UnknownDataCounter++, PreviousBitfieldProperty->GetOffset(), Info.CppType, MissingBits[0]));
                     }
                     if (MissingBits[1] > 0) {
-                        Members.emplace_back(CreateBitfieldPadding(UnknownDataCounter++, sp.Offset, PropInfo.CppType, MissingBits[1]));
+                        Members.emplace_back(CreateBitfieldPadding(UnknownDataCounter++, sp.Offset, Info.CppType, MissingBits[1]));
                     }
                 } else if (MissingBits[0] > 0) {
-                    Members.emplace_back(CreateBitfieldPadding(UnknownDataCounter++, sp.Offset, PropInfo.CppType, MissingBits[0]));
+                    Members.emplace_back(CreateBitfieldPadding(UnknownDataCounter++, sp.Offset, Info.CppType, MissingBits[0]));
                 }
 
                 PreviousBitfieldProperty = BoolProp;
@@ -314,14 +310,15 @@ void GeneratorPackage::GenerateMembers(const UStruct* Struct, int32_t Offset, co
 
             Members.emplace_back(std::move(sp));
 
-            const int32_t sizeMismatch = (Prop->GetElementSize() * Prop->GetArrayDim()) - (PropInfo.Size * Prop->GetArrayDim());
+            const auto sizeMismatch = static_cast<int32_t>(Prop->GetElementSize() * Prop->GetArrayDim()) -
+                                      static_cast<int32_t>(Info.Size * Prop->GetArrayDim());
             if (sizeMismatch > 0) {
                 Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, sizeMismatch, _XORSTR_("FIX WRONG TYPE SIZE OF PREVIOUS PROPERTY")));
             }
 
         } else {
 
-            const int32_t size = Prop->GetElementSize() * Prop->GetArrayDim();
+            const auto size = Prop->GetElementSize() * Prop->GetArrayDim();
             Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, size, _XORSTR_("UNKNOWN PROPERTY: ") + Prop->GetFullName()));
         }
 
@@ -329,7 +326,7 @@ void GeneratorPackage::GenerateMembers(const UStruct* Struct, int32_t Offset, co
     }
 
     if (Offset < Struct->GetPropertiesSize()) {
-        const int32_t size = Struct->GetPropertiesSize() - Offset;
+        const auto size = Struct->GetPropertiesSize() - Offset;
         Members.emplace_back(CreatePadding(UnknownDataCounter++, Offset, size, _XORSTR_("MISSED OFFSET")));
     }
 }
@@ -901,12 +898,12 @@ void GeneratorPackage::PrintClass(std::ostream& os, const GeneratorClass& Class)
     os << Class.NameCppFull << _XORSTR_(" {\npublic:\n");
 
     // Members
-    uint32_t Offset = Class.InheritedSize;
-    uint32_t Size = 0;
+    size_t Offset = Class.InheritedSize;
+    size_t Size = 0;
     for (auto&& m : Class.Members) {
 
-        uint32_t PrevOffset = Offset;
-        uint32_t PrevSize = Size;
+        size_t PrevOffset = Offset;
+        size_t PrevSize = Size;
         Offset = m.Offset;
         Size = m.Size;
 
