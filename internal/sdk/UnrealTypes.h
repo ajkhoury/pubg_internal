@@ -30,9 +30,11 @@ public:
     int32_t NameIndexEncrypted; // 0x0008 (size=0x0004)
     int32_t NameNumberEncrypted; // 0x000C (size=0x0004)
     int32_t InternalIndexEncrypted; // 0x0010 (size=0x0004)
+    uint8_t UnknownData0x0014[0x4]; // 0x0014 (size=0x0004)
     uint64_t OuterEncrypted; // 0x0018 (size=0x0008)
     uint64_t ClassEncrypted; // 0x0020 (size=0x0008)
     int32_t ObjectFlagsEncrypted; // 0x0028 (size=0x0004)
+    uint8_t UnknownData0x002C[0x4]; // 0x002C (size=0x0004)
 
     int32_t GetFlags() const;
     uint32_t GetUniqueId() const;
@@ -94,12 +96,11 @@ C_ASSERT(sizeof(UField) == 0x38);
 
 class UEnum : public UField {
 public:
-    FString CppType; // 0x0030 (size=0x0010)
+    uint8_t UnknownData0x0038[0x10]; // 0x0038 (size=0x0010)
     TArray<TPair<FName, int64_t>> Names; // 0x0048 (size=0x0010)
     uint8_t UnknownData0x0058[0x10]; // 0x0058 (size=0x0010)
     int32_t CppForm; // 0x0068 (size=0x0004)
-    uint8_t UnknownData0x006C[0x4]; // 0x006C (size=0x000C)
-    void* EnumDisplayNameFn; // 0x0070  (size=0x0008)
+    uint8_t UnknownData0x006C[0xC]; // 0x006C (size=0x000C)
 
     std::vector<std::string> GetNames() const;
 

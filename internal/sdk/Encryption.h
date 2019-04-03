@@ -112,9 +112,7 @@ void DecryptObjectFNameAsm(const int InNameIndexEncrypted,
 /**
  * World asm decryption routines.
  */
-unsigned __int64 DecryptWorldAsm(unsigned __int64 WorldEncrypted);
 unsigned __int64 DecryptPersistentLevelAsm(unsigned __int64 PersistentLevelEncrypted);
-unsigned __int64 DecryptCurrentLevelAsm(unsigned __int64 CurrentLevelEncrypted);
 unsigned __int64 DecryptActorsAsm(unsigned __int64 ActorsEncrypted);
 
 #ifdef __cplusplus

@@ -10,7 +10,8 @@ DecryptNamesAsm PROC
         sub     rsp, 8
         mov     rbp, rsp
 
-        mov     rax, rcx                ; RCX = NamesEncrypted
+        mov     QWORD PTR [rbp],0
+        mov     eax,ecx                     ; RCX = NamesEncrypted 
         rol     eax,16
         add     eax,06cec3cd4h
         rol     eax,16
@@ -35,14 +36,19 @@ DecryptNamesAsm ENDP
 ; uint64_t DecryptNameEntryIndexAsm(uint64_t IndexEncrypted)
 PUBLIC DecryptNameEntryIndexAsm
 DecryptNameEntryIndexAsm PROC
+        push    r8
+        push    r9
+        push    rdx
         push    rbx
+        push    rdi
+        push    rsi
         push    rbp
         sub     rsp, 8
         mov     rbp, rsp
 
-        mov     rax, rcx                ; RCX = IndexEncrypted
-        mov     r9,rcx
+        mov     r9,rcx                  ; RCX = IndexEncrypted
         shr     r9,32
+        mov     QWORD PTR [rbp],0
         mov     edx,ecx
         shr     edx,16
         movzx   eax,cx
@@ -85,7 +91,12 @@ DecryptNameEntryIndexAsm PROC
 
         add     rsp, 8
         pop     rbp
+        pop     rsi
+        pop     rdi
         pop     rbx
+        pop     rdx
+        pop     r9
+        pop     r8
         ret
 DecryptNameEntryIndexAsm ENDP
 
@@ -93,12 +104,14 @@ DecryptNameEntryIndexAsm ENDP
 PUBLIC DecryptChunksAsm
 DecryptChunksAsm PROC
         push    rbx
+        push    rdi
+        push    rsi
         push    rbp
         sub     rsp, 8
         mov     rbp, rsp
 
-        mov     rax,rcx                  ; RCX = ChunksEncrypted
-        lea     eax,[rcx-019d971c6h]
+        mov     QWORD PTR [rbp],0
+        lea     eax,[rcx-019d971c6h]    ; RCX = ChunksEncrypted
         xor     eax,0e6268e3ah
         mov     DWORD PTR [rbp],eax
         shr     rcx,32
@@ -109,6 +122,8 @@ DecryptChunksAsm PROC
 
         add     rsp, 8
         pop     rbp
+        pop     rsi
+        pop     rdi
         pop     rbx
         ret
 DecryptChunksAsm ENDP
@@ -124,6 +139,7 @@ DecryptNumElementsAsm PROC
         mov     rbp, rsp
 
         mov     eax,ecx                 ; RCX = NumElementsEncrypted
+        mov     QWORD PTR [rbp],0
         ror     eax,8
         add     eax,047674b09h
         shr     rcx,32

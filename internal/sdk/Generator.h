@@ -15,7 +15,7 @@
 enum class FileContentType {
     Structs,
     Classes,
-    Functions,
+    Sources,
     FunctionParameters
 };
 
@@ -28,17 +28,12 @@ struct GeneratorEnum {
 struct GeneratorMember {
     std::string Name;
     std::string Type;
-    size_t Offset;
-    size_t Size;
+    uint32_t Offset;
+    uint32_t Size;
     uint64_t Flags;
     std::string FlagsString;
     std::string Comment;
-};
-
-struct GeneratorStaticMember {
-    std::string Name;
-    std::string Type;
-    std::string Definition;
+    std::string StaticDef; // Optional static definition.
 };
 
 struct GeneratorParameter {
@@ -73,27 +68,23 @@ struct GeneratorMethod {
     bool IsStatic;
 };
 
-struct GeneratorPredefinedStaticMember {
-
-    std::string Type;
-    std::string Name;
-    std::string Definition;
-
-    static GeneratorPredefinedStaticMember Inline(const std::string&& Type,
-                                                  const std::string&& Name) { return { Type, Name, std::string() }; }
-    static GeneratorPredefinedStaticMember Static(const std::string&& Type,
-                                                  const std::string&& Name,
-                                                  const std::string&& Definition) { return { Type, Name, Definition }; }
-};
-
 struct GeneratorPredefinedMember {
+    GeneratorPredefinedMember() : Type(), Name(), Size(0), Offset((uint32_t)-1), StaticDef() {}
+    GeneratorPredefinedMember(const std::string& InType,
+                              const std::string& InName,
+                              size_t InSize = 0,
+                              size_t InOffset = -1)
+        : Type(InType), Name(InName), Size((uint32_t)InSize), Offset((uint32_t)InOffset), StaticDef() {}
+    GeneratorPredefinedMember(const std::string& InType,
+                              const std::string& InName,
+                              const std::string& InDefinition)
+        : Type(InType), Name(InName), Size(0), Offset((uint32_t)-1), StaticDef(InDefinition) {}
 
     std::string Type;
     std::string Name;
-    size_t Size;
-    size_t Offset;
-
-    static GeneratorPredefinedMember Inline(const std::string&& Type, const std::string&& Name) { return { Type, Name, 0, (uint32_t)-1 }; }
+    uint32_t Size;
+    uint32_t Offset;
+    std::string StaticDef;
 
     inline bool operator<(const GeneratorPredefinedMember& rhs) const { return Offset < rhs.Offset; }
     inline bool operator>(const GeneratorPredefinedMember& rhs) const { return Offset > rhs.Offset; }
@@ -110,9 +101,9 @@ struct GeneratorPredefinedMethod {
     Type MethodType;
 
     // Adds a predefined method which gets split in declaration and definition.
-    static GeneratorPredefinedMethod Default(const std::string&& Signature, const std::string&& Body) { return { Signature, Body, Type::Default }; }
+    static GeneratorPredefinedMethod Default(const std::string&& signature, const std::string&& body) { return { signature, body, Type::Default }; }
     // Adds a predefined method which gets included as an inline method.
-    static GeneratorPredefinedMethod Inline(const std::string&& Body) { return { std::string(), Body, Type::Inline }; }
+    static GeneratorPredefinedMethod Inline(const std::string&& body) { return { std::string(), body, Type::Inline }; }
 };
 
 struct GeneratorScriptStruct {
@@ -124,7 +115,6 @@ struct GeneratorScriptStruct {
     uint32_t InheritedSize;
     bool bMembersPredefined;
     std::vector<GeneratorMember> Members;
-    std::vector<GeneratorStaticMember> StaticMembers;
     std::vector<GeneratorPredefinedMethod> PredefinedMethods;
 };
 
@@ -181,7 +171,7 @@ public:
     inline const std::experimental::filesystem::path& GetPath() const { return Path; }
 
     // Add a predefined core member for the specified object.
-    inline void AddPredefinedClassMembers(const std::string& ObjectName,
+    inline void AddPredefinedMembers(const std::string& ObjectName,
                                           const std::vector<GeneratorPredefinedMember>& Members)
     {
         std::copy(std::begin(Members),
@@ -189,9 +179,9 @@ public:
                   std::back_inserter(PredefinedMembers[ObjectName]));
     }
 
-    // Add a predefined core member for the specified object.
-    inline void AddPredefinedClassStaticMembers(const std::string& ObjectName,
-                                                const std::vector<GeneratorPredefinedStaticMember>& Members)
+    // Add a predefined static member for the specified object.
+    inline void AddPredefinedStaticMembers(const std::string& ObjectName,
+                                                const std::vector<GeneratorPredefinedMember>& Members)
     {
         std::copy(std::begin(Members),
                   std::end(Members),
@@ -222,12 +212,12 @@ public:
         VirtualFunctionPatterns[ObjectName].push_back({SearchSize, Pattern, Function});
     }
 
-    // Gets the predefined members of the specific class.
-    bool GetPredefinedClassMembers(const std::string& ClassName,
-                                   std::vector<GeneratorPredefinedMember>& Members,
-                                   bool bSorted = false) const
+    // Gets the predefined members of the specific object.
+    bool GetPredefinedMembers(const std::string& ObjectName,
+                              std::vector<GeneratorPredefinedMember>& Members,
+                              bool bSorted = false) const
     {
-        auto it = PredefinedMembers.find(ClassName);
+        auto it = PredefinedMembers.find(ObjectName);
         if (it != std::end(PredefinedMembers)) {
             std::copy(std::begin(it->second), std::end(it->second), std::back_inserter(Members));
             if (bSorted) {
@@ -238,11 +228,11 @@ public:
         return false;
     }
 
-    // Gets the static predefined members of the specific class.
-    bool GetPredefinedClassStaticMembers(const std::string& ClassName,
-                                         std::vector<GeneratorPredefinedStaticMember>& Members) const
+    // Gets the static predefined members of the specific object.
+    bool GetPredefinedStaticMembers(const std::string& ObjectName,
+                                    std::vector<GeneratorPredefinedMember>& Members) const
     {
-        auto it = PredefinedStaticMembers.find(ClassName);
+        auto it = PredefinedStaticMembers.find(ObjectName);
         if (it != std::end(PredefinedStaticMembers)) {
             std::copy(std::begin(it->second), std::end(it->second), std::back_inserter(Members));
             return true;
@@ -250,11 +240,11 @@ public:
         return false;
     }
 
-    // Gets the predefined methods of the specific class.
-    bool GetPredefinedClassMethods(const std::string& ClassName,
+    // Gets the predefined methods of the specific object.
+    bool GetPredefinedMethods(const std::string& ObjectName,
                                    std::vector<GeneratorPredefinedMethod>& Methods) const
     {
-        auto it = PredefinedMethods.find(ClassName);
+        auto it = PredefinedMethods.find(ObjectName);
         if (it != std::end(PredefinedMethods)) {
             std::copy(std::begin(it->second), std::end(it->second), std::back_inserter(Methods));
             return true;
@@ -264,12 +254,12 @@ public:
 
     // Gets the patterns of virtual functions of the specific class.
     // The generator loops the virtual functions of the class and adds a class method if the pattern matches.
-    bool GetVirtualFunctionPatterns(const std::string& name,
-                                    std::vector<GeneratorPattern>& patterns) const
+    bool GetVirtualFunctionPatterns(const std::string& ObjectName,
+                                    std::vector<GeneratorPattern>& Patterns) const
     {
-        auto it = VirtualFunctionPatterns.find(name);
+        auto it = VirtualFunctionPatterns.find(ObjectName);
         if (it != std::end(VirtualFunctionPatterns)) {
-            std::copy(std::begin(it->second), std::end(it->second), std::back_inserter(patterns));
+            std::copy(std::begin(it->second), std::end(it->second), std::back_inserter(Patterns));
             return true;
         }
         return false;
@@ -303,7 +293,7 @@ private:
     bool bGenerateFunctionParametersFile;
 
     std::unordered_map<std::string, std::vector<GeneratorPredefinedMember>> PredefinedMembers;
-    std::unordered_map<std::string, std::vector<GeneratorPredefinedStaticMember>> PredefinedStaticMembers;
+    std::unordered_map<std::string, std::vector<GeneratorPredefinedMember>> PredefinedStaticMembers;
     std::unordered_map<std::string, std::vector<GeneratorPredefinedMethod>> PredefinedMethods;
     std::unordered_map<std::string, std::vector<GeneratorPattern>> VirtualFunctionPatterns;
 };

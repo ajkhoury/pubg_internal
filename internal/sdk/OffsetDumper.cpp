@@ -1851,16 +1851,8 @@ int DumpNames()
         LOG_INFO(_XOR_("FNameEntry::HashNext offset = 0x%08x"), NamesEntryHashNextOffset);
     }
 
-    if (NamesEntryIndexEncryptedOffset != -1) {
-        LOG_INFO(_XOR_("FNameEntry::IndexEncrypted offset = 0x%08x"), NamesEntryIndexEncryptedOffset);
-        LOG_INFO(_XOR_("FNameEntry::IndexEncrypted register = %s"), RegisterStrings[NamesEntryIndexEncryptedRegister]);
-        LOG_INFO(_XOR_("FNameEntry::IndexEncrypted decryption = {"));
-        std::string BufferString = utils::FormatBuffer(NamesEntryIndexDecryptionBegin,
-                                                       __MIN(static_cast<size_t>(NamesEntryIndexDecryptionEnd - NamesEntryIndexDecryptionBegin), 1024));
-        for (auto&& Line : utils::SplitString(BufferString, '\n')) {
-            LOG_INFO(Line.c_str());
-        }
-        LOG_INFO(_XOR_("}; "));
+    if (NamesEntryArrayElementsPerChunk != -1) {
+        LOG_INFO(_XOR_("TNameEntryArray::ElementsPerChunk value = %d"), NamesEntryArrayElementsPerChunk);
     }
 
     if (NamesGetEncryptedNamesRoutine) {
@@ -1878,8 +1870,16 @@ int DumpNames()
         LOG_INFO(_XOR_("}; "));
     }
 
-    if (NamesEntryArrayElementsPerChunk != -1) {
-        LOG_INFO(_XOR_("TNameEntryArray::ElementsPerChunk value = %d"), NamesEntryArrayElementsPerChunk);
+    if (NamesEntryIndexEncryptedOffset != -1) {
+        LOG_INFO(_XOR_("FNameEntry::IndexEncrypted offset = 0x%08x"), NamesEntryIndexEncryptedOffset);
+        LOG_INFO(_XOR_("FNameEntry::IndexEncrypted register = %s"), RegisterStrings[NamesEntryIndexEncryptedRegister]);
+        LOG_INFO(_XOR_("FNameEntry::IndexEncrypted decryption = {"));
+        std::string BufferString = utils::FormatBuffer(NamesEntryIndexDecryptionBegin,
+                                                       __MIN(static_cast<size_t>(NamesEntryIndexDecryptionEnd - NamesEntryIndexDecryptionBegin), 1024));
+        for (auto&& Line : utils::SplitString(BufferString, '\n')) {
+            LOG_INFO(Line.c_str());
+        }
+        LOG_INFO(_XOR_("}; "));
     }
 
     if (NamesEntryArrayChunksEncryptedOffset != -1) {

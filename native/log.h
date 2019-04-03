@@ -29,6 +29,8 @@ extern "C" {
  *  A message should not exceede 512 bytes after all string construction is
  *  done; otherwise this macro fails to log and returns non STATUS_SUCCESS.
  */
+#if defined(ENABLE_LOG)
+
 #if defined(__GNUC__) || defined(__clang__)
 #define LOG_DEBUG(fmt,...)  LogPrint(LogLevelDebug, __FUNCTION__, fmt, ##__VA_ARGS__)
 #define LOG_INFO(fmt,...)   LogPrint(LogLevelInfo,  __FUNCTION__, fmt, ##__VA_ARGS__)
@@ -40,6 +42,13 @@ extern "C" {
 #define LOG_WARN(fmt,...)   LogPrint(LogLevelWarn,  __FUNCTION__, fmt,   __VA_ARGS__)
 #define LOG_ERROR(fmt,...)  LogPrint(LogLevelError, __FUNCTION__, fmt,   __VA_ARGS__)
 #endif
+
+#else
+#define LOG_DEBUG(fmt,...)  ((void)fmt)
+#define LOG_INFO(fmt,...)   ((void)fmt)
+#define LOG_WARN(fmt,...)   ((void)fmt)
+#define LOG_ERROR(fmt,...)  ((void)fmt)
+#endif // ENABLE_LOG
 
 /**
  * Buffers a message as respective severity
@@ -53,6 +62,8 @@ extern "C" {
  *  expectable in order to avoid system instability.
  *  @see LOG_DEBUG
  */
+#if defined(ENABLE_LOG)
+
 #if defined(__GNUC__) || defined(__clang__)
 #define LOG_DEBUG_SAFE(fmt, ...)  LogPrint(LogLevelDebug | LogLevelOptSafe, __FUNCTION__, fmt, ##__VA_ARGS__)
 #define LOG_INFO_SAFE(fmt, ...)   LogPrint(LogLevelInfo  | LogLevelOptSafe, __FUNCTION__, fmt, ##__VA_ARGS__)
@@ -64,6 +75,13 @@ extern "C" {
 #define LOG_WARN_SAFE(fmt, ...)   LogPrint(LogLevelWarn  | LogLevelOptSafe, __FUNCTION__, fmt,   __VA_ARGS__)
 #define LOG_ERROR_SAFE(fmt, ...)  LogPrint(LogLevelError | LogLevelOptSafe, __FUNCTION__, fmt,   __VA_ARGS__)
 #endif
+
+#else
+#define LOG_DEBUG_SAFE(fmt,...)     ((void)fmt)
+#define LOG_INFO_SAFE(fmt,...)      ((void)fmt)
+#define LOG_WARN_SAFE(fmt,...)      ((void)fmt)
+#define LOG_ERROR_SAFE(fmt,...)     ((void)fmt)
+#endif // ENABLE_LOG
 
 
 typedef enum _LOG_LEVEL_OPTIONS {
@@ -102,6 +120,9 @@ typedef enum _LOG_LEVEL_OPTIONS {
     // For LogInitialize(). Do not append to log file.
     LogOptDisableAppend = 0x800ul
 } LOG_LEVEL_OPTIONS;
+
+
+#if defined(ENABLE_LOG)
 
 /**
  * Initializes the log system.
@@ -165,22 +186,18 @@ LogDoDbgPrint(
 #define LOG_DBG_PRINT(fmt, ...)  LogDoDbgPrint(fmt, __VA_ARGS__)
 #endif
 
+#else
 
-HANDLE
-LOGAPI
-LogGetStdout(
-    VOID
-    );
-HANDLE
-LOGAPI
-LogGetStderr(
-    VOID
-    );
-HANDLE
-LOGAPI
-LogGetStdin(
-    VOID
-    );
+#define LogInitialize(Flag,LogFilePath) \
+    STATUS_SUCCESS; \
+    (void)(Flag); \
+    (void)(LogFilePath)
+
+#define LogDestroy() ((void)0)
+
+#define LOG_DBG_PRINT(fmt, ...)     ((void)fmt)
+
+#endif // ENABLE_LOG
 
 #if defined(__cplusplus)
 } // extern "C"

@@ -68,14 +68,6 @@ public:
         return static_cast<int32_t>(DecryptNumElementsAsm(NumElementsEncrypted));
     }
 
-    //int32_t NumChunks() const
-    //{
-    //    union CryptValue NumChunksDecrypted;
-    //    NumChunksDecrypted.Qword = __PAIR64__(__ROR4__(__ROR4__(NumChunksEncrypted >> 32, 8) + 0x7B437B44, 8) ^ 0x84BC84BC,
-    //                                          __ROL4__(__ROL4__(NumChunksEncrypted, 16) + 0x7CFC0CC4, 16) ^ 0x7CFC0CC4u);
-    //    return static_cast<int32_t>(NumChunksDecrypted.Qword);
-    //}
-
     bool IsValidIndex(int32_t index) const
     {
         return index >= 0 && index < Num() && GetById(index) != NULL;
