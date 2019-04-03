@@ -28,11 +28,17 @@ struct GeneratorEnum {
 struct GeneratorMember {
     std::string Name;
     std::string Type;
-    uint32_t Offset;
-    uint32_t Size;
+    size_t Offset;
+    size_t Size;
     uint64_t Flags;
     std::string FlagsString;
     std::string Comment;
+};
+
+struct GeneratorStaticMember {
+    std::string Name;
+    std::string Type;
+    std::string Definition;
 };
 
 struct GeneratorParameter {
@@ -67,18 +73,27 @@ struct GeneratorMethod {
     bool IsStatic;
 };
 
-struct GeneratorPredefinedMember {
-    GeneratorPredefinedMember() : Type(), Name(), Size(0), Offset(-1) {}
-    GeneratorPredefinedMember(const std::string& InType,
-                              const std::string& InName,
-                              size_t InSize = 0,
-                              size_t InOffset = -1)
-        : Type(InType), Name(InName), Size((uint32_t)InSize), Offset((uint32_t)InOffset) {}
+struct GeneratorPredefinedStaticMember {
 
     std::string Type;
     std::string Name;
-    uint32_t Size;
-    uint32_t Offset;
+    std::string Definition;
+
+    static GeneratorPredefinedStaticMember Inline(const std::string&& Type,
+                                                  const std::string&& Name) { return { Type, Name, std::string() }; }
+    static GeneratorPredefinedStaticMember Static(const std::string&& Type,
+                                                  const std::string&& Name,
+                                                  const std::string&& Definition) { return { Type, Name, Definition }; }
+};
+
+struct GeneratorPredefinedMember {
+
+    std::string Type;
+    std::string Name;
+    size_t Size;
+    size_t Offset;
+
+    static GeneratorPredefinedMember Inline(const std::string&& Type, const std::string&& Name) { return { Type, Name, 0, (uint32_t)-1 }; }
 
     inline bool operator<(const GeneratorPredefinedMember& rhs) const { return Offset < rhs.Offset; }
     inline bool operator>(const GeneratorPredefinedMember& rhs) const { return Offset > rhs.Offset; }
@@ -95,9 +110,9 @@ struct GeneratorPredefinedMethod {
     Type MethodType;
 
     // Adds a predefined method which gets split in declaration and definition.
-    static GeneratorPredefinedMethod Default(const std::string&& signature, const std::string&& body) { return { signature, body, Type::Default }; }
+    static GeneratorPredefinedMethod Default(const std::string&& Signature, const std::string&& Body) { return { Signature, Body, Type::Default }; }
     // Adds a predefined method which gets included as an inline method.
-    static GeneratorPredefinedMethod Inline(const std::string&& body) { return { std::string(), body, Type::Inline }; }
+    static GeneratorPredefinedMethod Inline(const std::string&& Body) { return { std::string(), Body, Type::Inline }; }
 };
 
 struct GeneratorScriptStruct {
@@ -109,6 +124,7 @@ struct GeneratorScriptStruct {
     uint32_t InheritedSize;
     bool bMembersPredefined;
     std::vector<GeneratorMember> Members;
+    std::vector<GeneratorStaticMember> StaticMembers;
     std::vector<GeneratorPredefinedMethod> PredefinedMethods;
 };
 
@@ -173,6 +189,15 @@ public:
                   std::back_inserter(PredefinedMembers[ObjectName]));
     }
 
+    // Add a predefined core member for the specified object.
+    inline void AddPredefinedClassStaticMembers(const std::string& ObjectName,
+                                                const std::vector<GeneratorPredefinedStaticMember>& Members)
+    {
+        std::copy(std::begin(Members),
+                  std::end(Members),
+                  std::back_inserter(PredefinedStaticMembers[ObjectName]));
+    }
+
     // Add a predefined method for the specified object.
     inline void AddPredefinedMethods(const std::string& ObjectName,
                                      const std::vector<GeneratorPredefinedMethod>& Methods)
@@ -215,7 +240,7 @@ public:
 
     // Gets the static predefined members of the specific class.
     bool GetPredefinedClassStaticMembers(const std::string& ClassName,
-                                         std::vector<GeneratorPredefinedMember>& Members) const
+                                         std::vector<GeneratorPredefinedStaticMember>& Members) const
     {
         auto it = PredefinedStaticMembers.find(ClassName);
         if (it != std::end(PredefinedStaticMembers)) {
@@ -278,7 +303,7 @@ private:
     bool bGenerateFunctionParametersFile;
 
     std::unordered_map<std::string, std::vector<GeneratorPredefinedMember>> PredefinedMembers;
-    std::unordered_map<std::string, std::vector<GeneratorPredefinedMember>> PredefinedStaticMembers;
+    std::unordered_map<std::string, std::vector<GeneratorPredefinedStaticMember>> PredefinedStaticMembers;
     std::unordered_map<std::string, std::vector<GeneratorPredefinedMethod>> PredefinedMethods;
     std::unordered_map<std::string, std::vector<GeneratorPattern>> VirtualFunctionPatterns;
 };
@@ -365,7 +390,7 @@ private:
     std::vector<GeneratorScriptStruct> ScriptStructs;
 
 
-    std::string BuildMethodSignature(const GeneratorClass* c, const GeneratorMethod& m, bool inHeader) const;
+    std::string BuildMethodSignature(const GeneratorClass* c, const GeneratorMethod& m, bool inHeader, bool makeStaticFuncVar) const;
     // Builds the C++ method body.
     std::string BuildMethodBody(const GeneratorClass* c, const GeneratorMethod& m) const;
     // Print the C++ code of the class.

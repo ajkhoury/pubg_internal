@@ -1,6 +1,6 @@
         .CODE
 
-; uint64_t DecryptWorldAsm(uint64_t WorldEncrypted);
+; unsigned __int64 DecryptWorldAsm(unsigned __int64 WorldEncrypted);
 PUBLIC DecryptWorldAsm
 DecryptWorldAsm PROC
         push    rbx
@@ -33,7 +33,33 @@ DecryptWorldAsm PROC
         ret
 DecryptWorldAsm ENDP
 
-; uint64_t DecryptCurrentLevelAsm(uint64_t CurrentLevelEncrypted);
+; unsigned __int64 DecryptPersistentLevelAsm(unsigned __int64 PersistentLevelEncrypted);
+PUBLIC DecryptPersistentLevelAsm
+DecryptPersistentLevelAsm PROC
+        push    rbx
+        push    rbp
+        sub     rsp, 8
+        mov     rbp, rsp
+
+        mov     eax,ecx
+        ror     eax,8
+        sub     eax,038183477h
+        shr     rcx,32
+        ror     eax,8
+        add     ecx,046e84629h
+        xor     eax,0c7e7cb89h
+        xor     ecx,0b917b9d7h
+        mov     DWORD PTR [rbp],eax
+        mov     DWORD PTR [rbp+4],ecx
+        mov     rax,QWORD PTR [rbp]
+
+        add     rsp, 8
+        pop     rbp
+        pop     rbx
+        ret
+DecryptPersistentLevelAsm ENDP
+
+; unsigned __int64 DecryptCurrentLevelAsm(unsigned __int64 CurrentLevelEncrypted);
 PUBLIC DecryptCurrentLevelAsm
 DecryptCurrentLevelAsm PROC
         push    rbx
@@ -61,5 +87,28 @@ DecryptCurrentLevelAsm PROC
         pop     rbx
         ret
 DecryptCurrentLevelAsm ENDP
+
+; unsigned __int64 DecryptActorsAsm(unsigned __int64 ActorsEncrypted);
+PUBLIC DecryptActorsAsm
+DecryptActorsAsm PROC
+        push    rbx
+        push    rbp
+        sub     rsp, 8
+        mov     rbp, rsp
+
+        lea     eax, [rcx-1AE496EBh]    ; RCX = ActorsEncrypted
+        xor     eax, 55B5619Bh
+        shr     rcx, 32
+        add     ecx, 2E80624Bh
+        mov     DWORD PTR [rbp], eax
+        xor     ecx, 2B452B85h
+        mov     DWORD PTR [rbp+4], ecx
+        mov     rax, QWORD PTR [rbp]
+
+        add     rsp, 8
+        pop     rbp
+        pop     rbx
+        ret
+DecryptActorsAsm ENDP
 
         END

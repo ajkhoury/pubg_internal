@@ -1,7 +1,7 @@
-#include "vmt.h"
+#include "vthook.h"
 #include "utils.h"
 
-VTHook::VTHook(void *InObject)
+SafeVTableHook::SafeVTableHook(void *InObject)
 {
     Instance = static_cast<uintptr_t**>(InObject);
 

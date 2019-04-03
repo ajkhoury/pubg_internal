@@ -98,6 +98,18 @@ public:
     ElementType& operator[](int32_t Index) { return GetData()[Index]; }
     const ElementType& operator[](int32_t Index) const { return GetData()[Index]; }
 
+    //inline ElementType& Bottom() { return First(); }
+    //inline const ElementType& Bottom() const { return First(); }
+    //inline ElementType& Top() { return Last(); }
+    //inline const ElementType& Top() const { return Last(); }
+    //inline ElementType& First(int32_t IndexFromTheStart = 0) { return GetData()[IndexFromTheStart]; }
+    //inline const ElementType& First(int32_t IndexFromTheStart = 0) const { return GetData()[IndexFromTheStart]; }
+    //inline ElementType& Last(int32_t IndexFromTheEnd = 0) { return GetData()[ArrayNum - IndexFromTheEnd - 1]; }
+    //inline const ElementType& Last(int32_t IndexFromTheEnd = 0) const { return GetData()[ArrayNum - IndexFromTheEnd - 1]; }
+
+    inline ElementType& Get(int32_t Index) { return GetData()[Index]; }
+    inline const ElementType& Get(int32_t Index) const { return GetData()[Index]; }
+
 protected:
     ElementType* Data;
     int32_t ArrayNum;
@@ -123,6 +135,21 @@ private:
 public:
     using ElementType = wchar_t;
 
+    inline FString() {}
+
+    FString(const ElementType* Other)
+    {
+        Data.ArrayMax = Data.ArrayNum = *Other ? static_cast<int32_t>(wcslen(Other)) + 1 : 0;
+        if (Data.ArrayNum) {
+            Data.Data = const_cast<ElementType*>(Other);
+        }
+    }
+
+    ElementType const* Get() const { return Data.GetData(); }
+    ElementType* Get() { return const_cast<ElementType*>(Data.GetData()); }
+
+    inline bool IsValid() const { return Get() != nullptr; }
+
     std::string ToString() const
     {
         int size = WideCharToMultiByte(CP_UTF8, 0, Data.GetData(), Data.Num(), NULL, 0, NULL, NULL);
@@ -131,7 +158,7 @@ public:
         return str;
     }
 
-    ElementType *Get() const { return const_cast<ElementType *>(Data.GetData()); }
+    
 };
 
 struct FName {

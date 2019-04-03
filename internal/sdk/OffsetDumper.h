@@ -144,6 +144,16 @@ extern int8_t WorldEncryptedStackRegister; /* = -1; */
 extern uint8_t* WorldDecryptionBegin; /* = nullptr; */
 extern uint8_t* WorldDecryptionEnd; /* = nullptr; */
 
+extern size_t WorldPersistentLevelEncryptedOffset; /* = -1; */
+extern int8_t WorldPersistentLevelEncryptedRegister; /* = -1; */
+extern uint8_t* WorldPersistentLevelDecryptionBegin; /* = nullptr; */
+extern uint8_t* WorldPersistentLevelDecryptionEnd; /* = nullptr; */
+
+extern size_t LevelActorsEncryptedOffset; /* = -1; */
+extern int8_t LevelActorsEncryptedRegister; /* = -1; */
+extern uint8_t* LevelActorsDecryptionBegin; /* = nullptr; */
+extern uint8_t* LevelActorsDecryptionEnd; /* = nullptr; */
+
 int DumpWorld();
 
 }

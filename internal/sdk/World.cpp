@@ -8,22 +8,8 @@
 
 static uint64_t *GWorldEncrypted = NULL;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-uint64_t DecryptWorldAsm(uint64_t WorldEncrypted);
-uint64_t DecryptCurrentLevelAsm(uint64_t CurrentLevelEncrypted);
-
-#ifdef __cplusplus
-}
-#endif
-
 #if !defined(ENABLE_SDK)
-class UWorld : public UObject {
-public:
-    class ULevel* CurrentLevel;
-};
+class UWorld : public UObject {};
 class ULevel : public UObject {};
 #endif
 
@@ -77,7 +63,28 @@ const void* WorldProxy::GetAddress() const
     return WorldDecrypted.Pointer;
 }
 
-ULevel* WorldProxy::GetCurrentLevel()
+#if defined(ENABLE_SDK)
+TArray<class ULevel*> WorldProxy::GetLevels() const
+{
+    const UWorld* World = GetConstPtr();
+    if (World) {
+        return World->Levels;
+    }
+    return TArray<ULevel*>();
+}
+
+ULevel* WorldProxy::GetPersistentLevel() const
+{
+    UWorld* World = GetPtr();
+    if (World) {
+        CryptValue PersistentLevelDecrypted;
+        PersistentLevelDecrypted.Qword = DecryptPersistentLevelAsm(World->GetPersistentLevelEncrypted());
+        return static_cast<ULevel*>(PersistentLevelDecrypted.Pointer);
+    }
+    return nullptr;
+}
+
+ULevel* WorldProxy::GetCurrentLevel() const
 {
     UWorld* World = GetPtr();
     if (World) {
@@ -87,6 +94,6 @@ ULevel* WorldProxy::GetCurrentLevel()
     }
     return nullptr;
 }
-
+#endif // ENABLE_SDK
 
 

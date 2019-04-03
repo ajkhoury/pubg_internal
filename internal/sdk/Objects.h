@@ -1,7 +1,5 @@
 #pragma once
 
-#include <native/log.h>
-
 #include "Names.h"
 
 #include <unordered_map>
@@ -62,6 +60,11 @@ public:
 
     class UObject* FindObject(const std::string& name);
     class UObject const* FindObject(const std::string& name) const;
+
+    template<class T>
+    inline T* FindObject(const std::string& name) { return static_cast<T*>(FindObject(name)); }
+    template<class T>
+    inline T const* FindObject(const std::string& name) const { return static_cast<T const*>(FindObject(name)); }
 
     class UClass* FindClass(const std::string& Name);
     class UClass const* FindClass(const std::string& Name) const;

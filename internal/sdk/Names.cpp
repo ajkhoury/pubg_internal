@@ -105,7 +105,7 @@ private:
     uint64_t NumChunksEncrypted;    // 0x10
 };
 
-typedef TStaticIndirectArrayThreadSafeRead<FNameEntry, 2 * 1024 * 1024, 16628> TNameEntryArray;
+typedef TStaticIndirectArrayThreadSafeRead<FNameEntry, 2 * 1024 * 1024, 16224> TNameEntryArray;
 static TNameEntryArray *GNames = NULL;
 
 typedef

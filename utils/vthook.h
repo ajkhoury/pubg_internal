@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <memory>
 
-class VTHook {
+class SafeVTableHook {
 private:
     uintptr_t **Instance = nullptr;
     uintptr_t *OriginalVTable = nullptr;
@@ -12,9 +12,9 @@ private:
     size_t VTableSize = 0;
 
 public:
-    VTHook() = delete;
-    explicit VTHook(void *InInstance);
-    ~VTHook() { *Instance = OriginalVTable; }
+    SafeVTableHook() = delete;
+    explicit SafeVTableHook(void *InObject);
+    ~SafeVTableHook() { *Instance = OriginalVTable; }
 
     template<typename Fn = void *>
     inline Fn Install(const size_t FunctionIdx, void *NewFn)

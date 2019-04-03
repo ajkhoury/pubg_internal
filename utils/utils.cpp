@@ -2,7 +2,66 @@
 
 #include <sstream>
 
+#include <native/log.h>
+
 namespace utils {
+
+size_t
+UTLAPI
+FindVFunctionIndex(
+    IN const void *Instance,
+    IN size_t SearchSize,
+    IN std::string Pattern
+)
+{
+    size_t Result = (size_t)-1;
+
+    // Get the vtable address.
+    const void** VTable = *reinterpret_cast<const void***>(const_cast<void*>(Instance));
+
+    // Get the image bounds
+    uintptr_t ImageBase = reinterpret_cast<uintptr_t>(GetModuleHandleWIDE(NULL));
+    size_t ImageSize = GetModuleSize((HMODULE)ImageBase);
+
+    // Roughly calculate the VTable method count.
+    size_t MethodCount = 0;
+    while (1) {
+        uintptr_t VTableEntry = reinterpret_cast<uintptr_t>(VTable[MethodCount]);
+        if (VTableEntry < ImageBase || VTableEntry >= (ImageBase + ImageSize))
+            break;
+        ++MethodCount;
+    }
+
+    // Search each VTable method.
+    for (size_t i = 0; i < MethodCount; ++i) {
+
+        size_t Size = SearchSize;
+        const uint8_t* Base = static_cast<const uint8_t*>(VTable[i]);
+
+        // If this is a thunk, set the search base to the thunk target.
+        if (*Base == 0xE9) {
+            Base = static_cast<const uint8_t*>(utils::GetJmpTargetAddress(Base));
+        }
+
+        // Search for the pattern in this virtual function.
+        if (FindPatternIDA(Base, Size, Pattern)) {
+
+            // Set the result and break out of loop.
+            Result = i;
+
+            //LOG_INFO("VTable[%d] instructions = {", i);
+            //std::string BufString = utils::FormatBuffer((const uint8_t*)Base, 512);
+            //for (auto Line : utils::SplitString(BufString, '\n'))
+            //    LOG_INFO("%s", Line.c_str());
+            //LOG_INFO("};");
+
+            break;
+        }
+    }
+
+    // Return the result.
+    return Result;
+}
 
 WCHAR*
 UTLAPI
@@ -764,14 +823,14 @@ GetModuleFileNameCRC32(
 ULONG
 UTLAPI
 GetModuleSize(
-    IN HMODULE hModule
+    IN void* ModuleBase
 )
 {
     NTSTATUS Status;
     ULONG Size;
     PLDR_DATA_TABLE_ENTRY ModuleEntry;
 
-    Status = LdrFindEntryForAddress(hModule, &ModuleEntry);
+    Status = LdrFindEntryForAddress(ModuleBase, &ModuleEntry);
     if (NT_SUCCESS(Status)) {
 
         Size = ModuleEntry->SizeOfImage;

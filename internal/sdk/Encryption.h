@@ -97,7 +97,7 @@ unsigned __int64 DecryptNumElementsAsm(unsigned __int64 NumElementsEncrypted);
 unsigned __int64 DecryptNameEntryIndexAsm(unsigned __int64 IndexEncrypted);
 
 /**
- * Objects asm decryption routines
+ * Objects asm decryption routines.
  */
 unsigned __int64 DecryptObjectsAsm(unsigned __int64 ObjectsEncrypted);
 unsigned int DecryptObjectFlagsAsm(unsigned int ObjectFlagsEncrypted);
@@ -108,6 +108,14 @@ void DecryptObjectFNameAsm(const int InNameIndexEncrypted,
                            const int InNameNumberEncrypted,
                            int* OutNameIndex,
                            int* OutNameNumber);
+
+/**
+ * World asm decryption routines.
+ */
+unsigned __int64 DecryptWorldAsm(unsigned __int64 WorldEncrypted);
+unsigned __int64 DecryptPersistentLevelAsm(unsigned __int64 PersistentLevelEncrypted);
+unsigned __int64 DecryptCurrentLevelAsm(unsigned __int64 CurrentLevelEncrypted);
+unsigned __int64 DecryptActorsAsm(unsigned __int64 ActorsEncrypted);
 
 #ifdef __cplusplus
 }

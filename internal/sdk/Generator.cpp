@@ -228,7 +228,7 @@ void GeneratorPackage::GenerateMethods(const UClass* ClassObj, std::vector<Gener
     }
 }
 
-GeneratorMember CreatePadding(size_t Id, uint32_t Offset, uint32_t Size, std::string Reason)
+GeneratorMember CreatePadding(size_t Id, size_t Offset, size_t Size, std::string Reason)
 {
     GeneratorMember m;
     m.Name = tfm::format(_XOR_("UnknownData%02d[0x%X]"), Id, Size);
@@ -239,7 +239,7 @@ GeneratorMember CreatePadding(size_t Id, uint32_t Offset, uint32_t Size, std::st
     return m;
 }
 
-GeneratorMember CreateBitfieldPadding(size_t Id, uint32_t Offset, std::string Type, int BitsCount)
+GeneratorMember CreateBitfieldPadding(size_t Id, size_t Offset, std::string Type, int BitsCount)
 {
     GeneratorMember m;
     m.Name = tfm::format(_XOR_("UnknownData%02d : %d"), Id, BitsCount);
@@ -338,6 +338,12 @@ void GeneratorPackage::GenerateClass(const UClass* ClassObj)
 
     GeneratorClass c;
     c.Name = ClassObj->GetName();
+    // See if we should filter this class.
+    if (c.Name.find(_XOR_("ATslLobby_v3_C")) != std::string::npos) {
+        // Skip this class as it's problematic since it has duplicates and has
+        // no real important use.
+        return;
+    }
     c.FullName = ClassObj->GetFullName();
 
     LOG_DBG_PRINT("Class:          %-98s - instance: 0x%p\n", c.FullName.c_str(), ClassObj);
@@ -356,15 +362,14 @@ void GeneratorPackage::GenerateClass(const UClass* ClassObj)
         c.NameCppFull += _XORSTR_(" : public ") + fmt::MakeValidName(SuperStruct->GetNameCPP());
     }
 
-    std::vector<GeneratorPredefinedMember> PredefinedStaticMembers;
+    std::vector<GeneratorPredefinedStaticMember> PredefinedStaticMembers;
     if (Generator->GetPredefinedClassStaticMembers(c.FullName, PredefinedStaticMembers)) {
         for (auto&& Member : PredefinedStaticMembers) {
-            GeneratorMember m;
-            m.Offset = (uint32_t)-1;
-            m.Size = 0;
+            GeneratorStaticMember m;
             m.Name = Member.Name;
             m.Type = _XORSTR_("static ") + Member.Type;
-            c.Members.push_back(std::move(m));
+            m.Definition = Member.Definition;
+            c.StaticMembers.push_back(std::move(m));
         }
     }
 
@@ -458,7 +463,7 @@ void GeneratorPackage::GenerateClass(const UClass* ClassObj)
     if (Generator->GetVirtualFunctionPatterns(c.FullName, Patterns)) {
 
         // Get the vtable address.
-        void** const VTable = *reinterpret_cast<void** const*>(ClassObj);
+        const void** VTable = *reinterpret_cast<const void** const*>(ClassObj);
 
         uintptr_t ImageBase = reinterpret_cast<uintptr_t>(utils::GetModuleHandleWIDE(NULL));
         size_t ImageSize = utils::GetModuleSize((HMODULE)ImageBase);
@@ -475,27 +480,28 @@ void GeneratorPackage::GenerateClass(const UClass* ClassObj)
         LOG_INFO(_XOR_("%s VTable method count: %d"), c.FullName.c_str(), MethodCount);
 
         // Search for each pattern in each virtual function.
-        for (auto&& Pattern : Patterns) {
+        for (GeneratorPattern& Pattern : Patterns) {
             for (size_t i = 0; i < MethodCount; ++i) {
 
+                size_t Size = Pattern.SearchSize;
+                const uint8_t* Base = static_cast<const uint8_t*>(VTable[i]);
+
                 // If this is a thunk, set the search base to the thunk target.
-                void* SearchBase;
-                if (*static_cast<uint8_t*>(VTable[i]) == 0xE9) {
-                    SearchBase = utils::GetJmpTargetAddress(VTable[i]);
-                } else {
-                    SearchBase = VTable[i];
+                if (*Base == 0xE9) {
+                    Base = static_cast<const uint8_t*>(utils::GetJmpTargetAddress(Base));
                 }
+
                 //LOG_INFO(_XOR_("Search pattern \"%s\" in %s VTable[%d]: 0x%p"), Pattern.Pattern.c_str(), c.FullName.c_str(), i, SearchBase);
-                //if (i == 102) {
-                //    LOG_INFO(_XOR_("UClass::CreateDefaultObject instructions = {"));
-                //    std::string BufString = utils::FormatBuffer((const uint8_t*)SearchBase, 1024);
+                //if (i == 92) {
+                //    LOG_INFO(_XOR_("instructions = {"));
+                //    std::string BufString = utils::FormatBuffer((const uint8_t*)SearchBase, 512);
                 //    for (auto Line : utils::SplitString(BufString, '\n'))
                 //        LOG_INFO("%s", Line.c_str());
                 //    LOG_INFO(_XOR_("};"));
                 //}
 
                 // Search for the pattern in this virtual function.
-                if (utils::FindPatternIDA(SearchBase, Pattern.SearchSize, Pattern.Pattern)) {
+                if (utils::FindPatternIDA(Base, Size, Pattern.Pattern)) {
 
                     LOG_INFO(_XOR_("FOUND pattern \"%s\" in %s VTable[%d] !!!"), Pattern.Pattern.c_str(), c.FullName.c_str(), i);
 
@@ -762,9 +768,14 @@ void GeneratorPackage::PrintStruct(std::ostream& os, const GeneratorScriptStruct
     os << _XORSTR_("};\n");
 }
 
-std::string GeneratorPackage::BuildMethodSignature(const GeneratorClass* c, const GeneratorMethod& m, bool inHeader) const
+std::string GeneratorPackage::BuildMethodSignature(const GeneratorClass* c, const GeneratorMethod& m, bool inHeader, bool makeStaticFuncVar) const
 {
     std::ostringstream ss;
+
+    if (c && makeStaticFuncVar) {
+        std::string StaticFuncString = c->NameCpp + _XORSTR_("__") + m.Name;
+        ss << _XORSTR_("static class UFunction* ") << c->NameCpp << _XORSTR_("__") << m.Name << _XORSTR_(" = nullptr;\n");
+    }
 
     if (m.IsStatic && inHeader && !Generator->ShouldConvertStaticMethods()) {
         ss << _XORSTR_("static ");
@@ -807,8 +818,9 @@ std::string GeneratorPackage::BuildMethodBody(const GeneratorClass* c, const Gen
     std::ostringstream ss;
 
     // Function Pointer
-    ss << _XORSTR_("{\n    /*static*/ auto fn");
-
+    std::string StaticFuncString = c->NameCpp + _XORSTR_("__") + m.Name;
+    ss << _XORSTR_("{\n    if(!") << StaticFuncString << _XORSTR_(")\n");
+    ss << _XORSTR_("        ") << StaticFuncString;
     if (Generator->ShouldUseStrings()) {
 
         ss << _XORSTR_(" = UObject::FindObject<UFunction>(");
@@ -817,12 +829,13 @@ std::string GeneratorPackage::BuildMethodBody(const GeneratorClass* c, const Gen
         } else {
             ss << '\"' << m.FullName << '\"';
         }
-        ss << _XORSTR_(");\n\n");
+        ss << _XORSTR_(");\n");
 
     } else {
 
-       ss << _XORSTR_(" = UObject::GetObjectCasted<UFunction>(") << m.Index << _XORSTR_(");\n\n");
+       ss << _XORSTR_(" = UObject::GetObjectCasted<UFunction>(") << m.Index << _XORSTR_(");\n");
     }
+    ss << _XORSTR_("    class UFunction* fn = ") << StaticFuncString << _XORSTR_(";\n\n");
 
     // Parameters
     if (Generator->ShouldGenerateFunctionParametersFile() && c != nullptr) {
@@ -945,6 +958,14 @@ void GeneratorPackage::PrintClass(std::ostream& os, const GeneratorClass& Class)
         }
     }
 
+    // Predefined static members.
+    if (!Class.StaticMembers.empty()) {
+        os << '\n';
+        for (auto&& m : Class.StaticMembers) {
+            tfm::format(os, _XOR_("    %-50s %-58s// PREDEFINED STATIC FIELD\n"), m.Type, m.Name + ';');
+        }
+    }
+
     // Predefined methods.
     if (!Class.PredefinedMethods.empty()) {
         os << '\n';
@@ -962,7 +983,7 @@ void GeneratorPackage::PrintClass(std::ostream& os, const GeneratorClass& Class)
     if (!Class.Methods.empty()) {
         os << '\n';
         for (auto&& m : Class.Methods) {
-            os << _XORSTR_("    ") << BuildMethodSignature(nullptr, m, true) << _XORSTR_(";\n");
+            os << _XORSTR_("    ") << BuildMethodSignature(nullptr, m, true, false) << _XORSTR_(";\n");
         }
     }
 
@@ -1033,6 +1054,16 @@ void GeneratorPackage::SaveFunctions(const std::experimental::filesystem::path& 
     PrintSectionHeader(os, _XOR_("Functions"));
 
     for (auto&& s : ScriptStructs) {
+
+        // Predefined static members.
+        for (auto&& m : s.StaticMembers) {
+            os << m.Type << ' ' << s.NameCpp << _XORSTR_("::") << m.Name;
+            if (!m.Definition.empty()) {
+                os << _XORSTR_(" = ") << m.Definition;
+            }
+            os << _XORSTR_(";\n");
+        }
+
         // Predefined struct methods.
         for (auto&& m : s.PredefinedMethods) {
             if (m.MethodType != GeneratorPredefinedMethod::Type::Inline) {
@@ -1042,15 +1073,26 @@ void GeneratorPackage::SaveFunctions(const std::experimental::filesystem::path& 
     }
 
     for (auto&& c : Classes) {
+
+        // Predefined static members.
+        for (auto&& m : c.StaticMembers) {
+            os << m.Type << ' ' << c.NameCpp << _XORSTR_("::") << m.Name;
+            if (!m.Definition.empty()) {
+                os << _XORSTR_(" = ") << m.Definition;
+            }
+            os << _XORSTR_(";\n");
+        }
+
         // Predefined class methods.
         for (auto&& m : c.PredefinedMethods) {
             if (m.MethodType != GeneratorPredefinedMethod::Type::Inline) {
                 os << m.Body << "\n\n";
             }
         }
+
         // Generate methods.
         for (auto&& m : c.Methods) {
-            os << "// " << m.FullName << '\n' << "// (" << m.FlagsString << ")";
+            os << "// " << m.FullName << '\n' << "// (" << m.FlagsString << ')';
             if (!m.Parameters.empty()) {
                 os << _XORSTR_("\n// Parameters:");
                 for (auto&& param : m.Parameters) {
@@ -1058,7 +1100,7 @@ void GeneratorPackage::SaveFunctions(const std::experimental::filesystem::path& 
                 }
             }
             os << '\n';
-            os << BuildMethodSignature(&c, m, false) << '\n';
+            os << BuildMethodSignature(&c, m, false, true) << '\n';
             os << BuildMethodBody(&c, m) << "\n\n";
         }
     }
@@ -1091,8 +1133,8 @@ bool GeneratorPackage::Save() const
     std::experimental::filesystem::path SdkPath = Generator->GetPath() / "gen";
 
     if ((from(Enums) >> where([](auto&& e) { return !e.Values.empty(); }) >> any()) ||
-        (from(ScriptStructs) >> where([](auto&& s) { return !s.Members.empty() || !s.PredefinedMethods.empty(); }) >> any()) ||
-        (from(Classes) >> where([](auto&& c) { return !c.Members.empty() || !c.PredefinedMethods.empty() || !c.Methods.empty(); }) >> any()))
+        (from(ScriptStructs) >> where([](auto&& s) { return !s.Members.empty() || !s.StaticMembers.empty() || !s.PredefinedMethods.empty(); }) >> any()) ||
+        (from(Classes) >> where([](auto&& c) { return !c.Members.empty() || !c.StaticMembers.empty() || !c.PredefinedMethods.empty() || !c.Methods.empty(); }) >> any()))
     {
         SaveStructs(SdkPath);
         SaveClasses(SdkPath);

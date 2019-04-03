@@ -11,16 +11,16 @@ DecryptNamesAsm PROC
         mov     rbp, rsp
 
         mov     rax, rcx                ; RCX = NamesEncrypted
-        xor     eax,048c1fc42h
-        not     eax
-        sub     eax,02d6db572h
-        xor     eax,080ac4933h
+        rol     eax,16
+        add     eax,06cec3cd4h
+        rol     eax,16
+        xor     eax,06cec3cd4h
         mov     DWORD PTR [rbp],eax
         shr     rcx,32
-        xor     ecx,0e3923917h
-        not     ecx
-        sub     ecx,02e322eb2h
-        xor     ecx,0995fe85ah
+        ror     ecx,8
+        add     ecx,06b536b54h
+        ror     ecx,8
+        xor     ecx,094ac94ach
         mov     DWORD PTR [rbp+4],ecx
         mov     rax,QWORD PTR [rbp]
 
@@ -41,20 +41,45 @@ DecryptNameEntryIndexAsm PROC
         mov     rbp, rsp
 
         mov     rax, rcx                ; RCX = IndexEncrypted
-        xor     eax,0193e03bdh
-        rol     eax,8
-        sub     eax,04bcb9bf4h
-        xor     eax,0b43e03bdh
-        rol     eax,8
-        xor     eax,0b434640ch
-        mov     DWORD PTR [rbp],eax
-        shr     rcx,32
-        xor     ecx,07e6dc6e8h
-        ror     ecx,16
-        sub     ecx,04c744c74h
-        xor     ecx,0196dc6e8h
-        ror     ecx,16
-        xor     ecx,04c744c74h
+        mov     r9,rcx
+        shr     r9,32
+        mov     edx,ecx
+        shr     edx,16
+        movzx   eax,cx
+        xor     edx,eax
+        and     ecx,0ffff0000h
+        or      edx,ecx
+        add     edx,04e8e5652h
+        mov     ecx,edx
+        shr     ecx,16
+        movzx   eax,cx
+        ror     ax,8
+        movzx   r8d,ax
+        shl     r8d,16
+        movzx   eax,dx
+        xor     ecx,eax
+        or      r8d,ecx
+        xor     r8d,04e8e5652h
+        mov     DWORD PTR [rbp],r8d
+        mov     edx,r9d
+        shr     edx,16
+        movzx   eax,dx
+        xor     ax,r9w
+        ror     ax,8
+        movzx   ecx,ax
+        ror     dx,8
+        movzx   edx,dx
+        shl     edx,16
+        or      edx,ecx
+        add     edx,04d114d92h
+        mov     eax,edx
+        shr     eax,16
+        xor     ax,dx
+        ror     ax,8
+        movzx   ecx,ax
+        and     edx,0ffff0000h
+        or      ecx,edx
+        xor     ecx,0b2eeb26eh
         mov     DWORD PTR [rbp+4],ecx
         mov     rax,QWORD PTR [rbp]
 
@@ -72,17 +97,13 @@ DecryptChunksAsm PROC
         sub     rsp, 8
         mov     rbp, rsp
 
-        mov     rax,rcx
-        rol     eax,16
-        sub     eax,073f3234ch
-        rol     eax,16
-        xor     eax,08c0cdcb4h
+        mov     rax,rcx                  ; RCX = ChunksEncrypted
+        lea     eax,[rcx-019d971c6h]
+        xor     eax,0e6268e3ah
         mov     DWORD PTR [rbp],eax
         shr     rcx,32
-        ror     ecx,8
-        sub     ecx,074cc74cch
-        ror     ecx,8
-        xor     ecx,074cc74cch
+        sub     ecx,01a061a86h
+        xor     ecx,01a061a86h
         mov     DWORD PTR [rbp+4],ecx
         mov     rax,QWORD PTR [rbp]
 
@@ -102,22 +123,14 @@ DecryptNumElementsAsm PROC
         sub     rsp, 8
         mov     rbp, rsp
 
-        mov     rax,rcx
-        not     eax
+        mov     eax,ecx                 ; RCX = NumElementsEncrypted
+        ror     eax,8
+        add     eax,047674b09h
         shr     rcx,32
-        add     eax,049618a8fh
-        not     ecx
-        not     eax
-        sub     ecx,045fd2a88h
-        sub     eax,052f2a63dh
-        not     ecx
-        not     eax
-        add     ecx,02ce22ca3h
-        sub     eax,0279e7571h
-        not     ecx
-        xor     eax,052f2a63ch
-        add     ecx,04902d578h
-        xor     ecx,02ce22ca2h
+        ror     eax,8
+        sub     ecx,039973957h
+        xor     eax,047674b09h
+        xor     ecx,039973957h
         mov     DWORD PTR [rbp],eax
         mov     DWORD PTR [rbp+4],ecx
         mov     rax,QWORD PTR [rbp]

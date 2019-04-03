@@ -1,7 +1,6 @@
 #include "log.h"
 #include "eresource.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -94,15 +93,14 @@ LogpIsLogFileEnabled(
 )
 {
     if (Info->LogBuffer1 != NULL) {
-        assert(Info->LogBuffer2 != NULL);
-        assert(Info->LogBufferHead != NULL);
-        assert(Info->LogBufferTail != NULL);
+        //assert(Info->LogBuffer2 != NULL);
+        //assert(Info->LogBufferHead != NULL);
+        //assert(Info->LogBufferTail != NULL);
         return TRUE;
     }
-
-    assert(!Info->LogBuffer2);
-    assert(!Info->LogBufferHead);
-    assert(!Info->LogBufferTail);
+    //assert(!Info->LogBuffer2);
+    //assert(!Info->LogBufferHead);
+    //assert(!Info->LogBufferTail);
     return FALSE;
 }
 
@@ -114,13 +112,12 @@ LogpIsLogFileActivated(
 )
 {
     if (Info->BufferFlushThreadShouldBeAlive) {
-        assert(Info->BufferFlushThreadHandle != NULL);
-        assert(Info->LogFileHandle != NULL);
+        //assert(Info->BufferFlushThreadHandle != NULL);
+        //assert(Info->LogFileHandle != NULL);
         return TRUE;
     }
-
-    assert(!Info->BufferFlushThreadHandle);
-    assert(!Info->LogFileHandle);
+    //assert(!Info->BufferFlushThreadHandle);
+    //assert(!Info->LogFileHandle);
     return FALSE;
 }
 
@@ -282,7 +279,7 @@ LogpBufferFlushThreadRoutine(
     Info->BufferFlushThreadStarted = TRUE;
 
     while (Info->BufferFlushThreadShouldBeAlive) {
-        assert(LogpIsLogFileActivated(Info));
+        //assert(LogpIsLogFileActivated(Info));
 
         if (Info->LogBufferHead[0]) {
             Status = LogpFlushLogBuffer(Info);
@@ -522,24 +519,13 @@ LogpInitializeBufferInfo(
     Info->LogBufferTail = Info->LogBuffer1;
 
     //
-    // Get the stdout, stderr, and stdin handles.
+    // Set the stdout, stderr, and stdin modes.
     //
-    Info->StdoutOld = GetStdHandle(STD_OUTPUT_HANDLE);
-    Info->StderrOld = GetStdHandle(STD_ERROR_HANDLE);
-    Info->StdinOld = GetStdHandle(STD_INPUT_HANDLE);
-
-    AllocConsole();
-    AttachConsole((DWORD)(ULONG_PTR)NtCurrentProcessId());
-
-    Info->Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
-    Info->Stderr = GetStdHandle(STD_ERROR_HANDLE);
-    Info->Stdin = GetStdHandle(STD_INPUT_HANDLE);
-
     SetConsoleMode(Info->Stdout, ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT);
     SetConsoleMode(Info->Stdin, ENABLE_INSERT_MODE |
-                                ENABLE_EXTENDED_FLAGS |
-                                ENABLE_PROCESSED_INPUT |
-                                ENABLE_QUICK_EDIT_MODE);
+                   ENABLE_EXTENDED_FLAGS |
+                   ENABLE_PROCESSED_INPUT |
+                   ENABLE_QUICK_EDIT_MODE);
 
     //
     // Initialize the log file.
@@ -560,25 +546,43 @@ LogInitialize(
     const wchar_t* filePath
 )
 {
-    int rc;
+    int rc = NOERROR;
 
     g_LogFlags = flags;
     RtlZeroMemory(&g_LogBufferInfo, sizeof(LOG_BUFFER_INFO));
+
+    //
+    // Create console instance.
+    //
+    AllocConsole();
+
+    //AttachConsole((DWORD)(ULONG_PTR)NtCurrentProcessId());
+
+    //
+    // Get the stdout, stderr, and stdin handles.
+    //
+    g_LogBufferInfo.Stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+    g_LogBufferInfo.Stderr = GetStdHandle(STD_ERROR_HANDLE);
+    g_LogBufferInfo.Stdin = GetStdHandle(STD_INPUT_HANDLE);
+    g_LogBufferInfo.StdoutOld = g_LogBufferInfo.Stdout;
+    g_LogBufferInfo.StderrOld = g_LogBufferInfo.Stderr;
+    g_LogBufferInfo.StdinOld = g_LogBufferInfo.Stdin;
 
     //
     // Initialize a log file if a log file path is specified.
     //
     if (filePath != NULL) {
         rc = LogpInitializeBufferInfo(filePath, &g_LogBufferInfo);
-        assert(rc == NOERROR);
     }
 
 #if defined(_DEBUG)
-    // Test the log.
-    rc = LOG_INFO("Log has been initialized.");
-    if (rc) {
-        if (filePath) {
-            LogpFinalizeBufferInfo(&g_LogBufferInfo);
+    if (rc == NOERROR) {
+        // Test the log.
+        rc = LOG_INFO("Log has been initialized.");
+        if (rc) {
+            if (filePath) {
+                LogpFinalizeBufferInfo(&g_LogBufferInfo);
+            }
         }
     }
 #endif // _DEBUG
@@ -908,7 +912,9 @@ LogPrint(
     va_end(Args);
 
     if (rc < 0) {
+        #if defined(_DEBUG)
         DebugBreak();
+        #endif
         return rc;
     }
 
@@ -920,7 +926,9 @@ LogPrint(
 
         LogMessage = (char*)malloc(4096);
         if (!LogMessage) {
+            #if defined(_DEBUG)
             DebugBreak();
+            #endif
             return STATUS_NO_MEMORY;
         }
 
@@ -929,7 +937,9 @@ LogPrint(
         va_end(Args);
 
         if (rc < 0) {
+            #if defined(_DEBUG)
             DebugBreak();
+            #endif
             return rc;
         }
 
@@ -938,7 +948,9 @@ LogPrint(
     } else {
 
         if (LogMessage[0] == '\0') {
+            #if defined(_DEBUG)
             DebugBreak();
+            #endif
             return STATUS_INVALID_PARAMETER;
         }
 
@@ -960,7 +972,9 @@ LogPrint(
             }
 
             if (rc < 0) {
+                #if defined(_DEBUG)
                 DebugBreak();
+                #endif
                 break;
             }
 
@@ -968,7 +982,9 @@ LogPrint(
 
             rc = LogpPut(Message, Level & 0x0F);
             if (rc < 0) {
+                #if defined(_DEBUG)
                 DebugBreak();
+                #endif
                 break;
             }
 
@@ -986,14 +1002,19 @@ LogPrint(
         //
         rc = LogpMakePrefix(Level & 0xF0, FunctionName, LogMessage, Message, RTL_NUMBER_OF(Message));
         if (rc < 0) {
+            #if defined(_DEBUG)
             DebugBreak();
+            #endif
             return rc;
         }
 
         rc = LogpPut(Message, Level & 0x0F);
+
+        #if defined(_DEBUG)
         if (rc < 0) {
             DebugBreak();
         }
+        #endif
     }
 
     return rc;

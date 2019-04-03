@@ -27,11 +27,11 @@ class UFunction;
 class UObject {
 public:
     void** VTable; // 0x0000 (size=0x0008)
-    uint64_t ClassEncrypted; // 0x0008 (size=0x0008)
+    int32_t NameIndexEncrypted; // 0x0008 (size=0x0004)
+    int32_t NameNumberEncrypted; // 0x000C (size=0x0004)
     int32_t InternalIndexEncrypted; // 0x0010 (size=0x0004)
-    int32_t NameIndexEncrypted; // 0x0014 (size=0x0004)
-    int32_t NameNumberEncrypted; // 0x0018 (size=0x0004)
-    uint64_t OuterEncrypted; // 0x0020 (size=0x0008)
+    uint64_t OuterEncrypted; // 0x0018 (size=0x0008)
+    uint64_t ClassEncrypted; // 0x0020 (size=0x0008)
     int32_t ObjectFlagsEncrypted; // 0x0028 (size=0x0004)
 
     int32_t GetFlags() const;
@@ -95,11 +95,11 @@ C_ASSERT(sizeof(UField) == 0x38);
 class UEnum : public UField {
 public:
     FString CppType; // 0x0030 (size=0x0010)
-    TArray<TPair<FName, int64_t>> Names; // 0x0040 (size=0x0010)
-    uint8_t UnknownData0x0050[0x10]; // 0x0050 (size=0x0010)
-    int32_t CppForm; // 0x0060 (size=0x0004)
-    uint8_t UnknownData0x0064[0x4]; // 0x0064 (size=0x0004)
-    void* EnumDisplayNameFn; // 0x0068  (size=0x0008)
+    TArray<TPair<FName, int64_t>> Names; // 0x0048 (size=0x0010)
+    uint8_t UnknownData0x0058[0x10]; // 0x0058 (size=0x0010)
+    int32_t CppForm; // 0x0068 (size=0x0004)
+    uint8_t UnknownData0x006C[0x4]; // 0x006C (size=0x000C)
+    void* EnumDisplayNameFn; // 0x0070  (size=0x0008)
 
     std::vector<std::string> GetNames() const;
 
@@ -109,12 +109,12 @@ C_ASSERT(sizeof(UEnum) == 0x78);
 
 class UStruct : public UField {
 public:
-    uint8_t UnknownData0x0038[0x10]; // 0x0038 (size=0x0010)
-    int32_t PropertiesSize; // 0x0048 (size=0x0004)
-    uint8_t UnknownData0x004C[0x6C]; // 0x004C (size=0x006C)
-    UField* Children; // 0x00B8 (size=0x0008)
-    int32_t MinAlignment; // 0x00C0 (size=0x0004)
-    uint8_t UnknownData0x00C4[0x1C]; // 0x00C4 (size=0x001C)
+    int32_t MinAlignment; // 0x0038 (size=0x0004)
+    uint8_t UnknownData0x003C[0x4]; // 0x003C (size=0x0004)
+    UField* Children; // 0x0040 (size=0x0008)
+    uint8_t UnknownData0x0048[0x88]; // 0x0048 (size=0x0088)
+    int32_t PropertiesSize; // 0x00D0 (size=0x0004)
+    uint8_t UnknownData0x00D4[0xC]; // 0x00D4 (size=0x000C)
     class UStruct* SuperStruct; // 0x00E0 (size=0x0008)
 
     inline UStruct* GetSuper() const { return SuperStruct; }
@@ -136,14 +136,15 @@ C_ASSERT(sizeof(UScriptStruct) == 0xF8);
 
 class UFunction : public UStruct {
 public:
-    uint8_t UnknownData0x00E8[0x3C]; // 0x00E8 (size=0x003C)
-    uint32_t FunctionFlags; // 0x0124 (size=0x0004)
+    uint8_t UnknownData0x00E8[0x48]; // 0x00E8 (size=0x0048)
+    uint32_t FunctionFlags; // 0x0130 (size=0x0004)
+    uint8_t UnknownData0x0134[0x4]; // 0x0134 (size=0x0004)
 
     inline uint32_t GetFunctionFlags() const { return FunctionFlags; }
 
     DECLARE_STATIC_CLASS(Function);
 }; // size=0x0128
-C_ASSERT(sizeof(UFunction) == 0x128);
+C_ASSERT(sizeof(UFunction) == 0x138);
 
 enum class FunctionFlags : uint32_t {
     Final = 0x00000001,

@@ -410,7 +410,7 @@ int DumpObjects()
         LOG_INFO(_XOR_("FUObjectArray::ObjObjects.Objects decryption = {"));
         std::string BufferString = utils::FormatBuffer(ObjectsDecryptionBegin,
                                                        __MIN(static_cast<size_t>(ObjectsDecryptionEnd - ObjectsDecryptionBegin), 1024));
-        for (auto Line : utils::SplitString(BufferString, '\n')) {
+        for (auto&& Line : utils::SplitString(BufferString, '\n')) {
             LOG_INFO(Line.c_str());
         }
         LOG_INFO(_XOR_("}; "));
@@ -423,7 +423,7 @@ int DumpObjects()
         LOG_INFO(_XOR_("UObject::InternalIndexEncrypted decryption = {"));
         std::string BufferString = utils::FormatBuffer(ObjectInternalIndexDecryptionBegin,
                                                        __MIN(static_cast<size_t>(ObjectInternalIndexDecryptionEnd - ObjectInternalIndexDecryptionBegin), 1024));
-        for (auto Line : utils::SplitString(BufferString, '\n')) {
+        for (auto&& Line : utils::SplitString(BufferString, '\n')) {
             LOG_INFO(Line.c_str());
         }
         LOG_INFO(_XOR_("}; "));
@@ -552,7 +552,7 @@ int DumpObjects()
     Found = reinterpret_cast<const uint8_t *>(TargetAddress);
     //LOG_INFO(_XOR_("UObjectBaseUtility::GetOutermost code = {"));
     //std::string GetOutermostString = utils::FormatBuffer(Found, 256);
-    //for (auto Line : utils::SplitString(GetOutermostString, '\n')) {
+    //for (auto&& Line : utils::SplitString(GetOutermostString, '\n')) {
     //    LOG_INFO(Line.c_str());
     //}
     //LOG_INFO(_XOR_("};"));
@@ -635,7 +635,7 @@ int DumpObjects()
         LOG_INFO(_XOR_("UObject::ObjectFlagsEncrypted decryption = {"));
         std::string BufferString = utils::FormatBuffer(ObjectFlagsDecryptionBegin,
                                                        __MIN(static_cast<size_t>(ObjectFlagsDecryptionEnd - ObjectFlagsDecryptionBegin), 1024));
-        for (auto Line : utils::SplitString(BufferString, '\n')) {
+        for (auto&& Line : utils::SplitString(BufferString, '\n')) {
             LOG_INFO(Line.c_str());
         }
         LOG_INFO(_XOR_("}; "));
@@ -648,7 +648,7 @@ int DumpObjects()
         LOG_INFO(_XOR_("UObject::OuterEncrypted decryption = {"));
         std::string BufferString = utils::FormatBuffer(ObjectOuterDecryptionBegin,
                                                        __MIN(static_cast<size_t>(ObjectOuterDecryptionEnd - ObjectOuterDecryptionBegin), 1024));
-        for (auto Line : utils::SplitString(BufferString, '\n')) {
+        for (auto&& Line : utils::SplitString(BufferString, '\n')) {
             LOG_INFO(Line.c_str());
         }
         LOG_INFO(_XOR_("}; "));
@@ -809,7 +809,7 @@ int DumpObjects()
         LOG_INFO(_XOR_("UObject::ClassEncrypted decryption = {"));
         std::string BufferString = utils::FormatBuffer(ObjectClassDecryptionBegin,
                                                        __MIN(static_cast<size_t>(ObjectClassDecryptionEnd - ObjectClassDecryptionBegin), 1024));
-        for (auto Line : utils::SplitString(BufferString, '\n')) {
+        for (auto&& Line : utils::SplitString(BufferString, '\n')) {
             LOG_INFO(Line.c_str());
         }
         LOG_INFO(_XOR_("}; "));
@@ -823,7 +823,7 @@ int DumpObjects()
         LOG_INFO(_XOR_("UObject::NameEncrypted decryption = {"));
         std::string BufferString = utils::FormatBuffer(ObjectNameDecryptionBegin,
                                                        __MIN(static_cast<size_t>(ObjectNameDecryptionEnd - ObjectNameDecryptionBegin), 1024));
-        for (auto Line : utils::SplitString(BufferString, '\n')) {
+        for (auto&& Line : utils::SplitString(BufferString, '\n')) {
             LOG_INFO(Line.c_str());
         }
         LOG_INFO(_XOR_("}; "));
@@ -1336,8 +1336,8 @@ int DumpStructs()
         LOG_ERROR(_XOR_("Failed to dump UObject rc %d"), rc);
         return rc < 0 ? rc : E_FAIL;
     }
-    for (auto line : utils::SplitString(UObjectOutput, '\n')) {
-        LOG_INFO("%s", line.c_str());
+    for (auto&& Line : utils::SplitString(UObjectOutput, '\n')) {
+        LOG_INFO("%s", Line.c_str());
     }
 
     //
@@ -1354,8 +1354,8 @@ int DumpStructs()
         LOG_ERROR(_XOR_("Failed to dump UField rc %d"), rc);
         return rc < 0 ? rc : E_FAIL;
     }
-    for (auto line : utils::SplitString(UFieldOutput, '\n')) {
-        LOG_INFO("%s", line.c_str());
+    for (auto&& Line : utils::SplitString(UFieldOutput, '\n')) {
+        LOG_INFO("%s", Line.c_str());
     }
 
     //
@@ -1375,8 +1375,8 @@ int DumpStructs()
         LOG_ERROR(_XOR_("Failed to dump UStruct rc %d"), rc);
         return rc < 0 ? rc : E_FAIL;
     }
-    for (auto line : utils::SplitString(UStructOutput, '\n')) {
-        LOG_INFO("%s", line.c_str());
+    for (auto&& Line : utils::SplitString(UStructOutput, '\n')) {
+        LOG_INFO("%s", Line.c_str());
     }
 
     //
@@ -1393,8 +1393,8 @@ int DumpStructs()
         LOG_ERROR(_XOR_("Failed to dump UFunction rc %d"), rc);
         return rc < 0 ? rc : E_FAIL;
     }
-    for (auto line : utils::SplitString(UFunctionOutput, '\n')) {
-        LOG_INFO("%s", line.c_str());
+    for (auto&& Line : utils::SplitString(UFunctionOutput, '\n')) {
+        LOG_INFO("%s", Line.c_str());
     }
 
     //
@@ -1414,8 +1414,8 @@ int DumpStructs()
         LOG_ERROR(_XOR_("Failed to dump UProperty rc %d"), rc);
         return rc < 0 ? rc : E_FAIL;
     }
-    for (auto line : utils::SplitString(UPropertyOutput, '\n')) {
-        LOG_INFO("%s", line.c_str());
+    for (auto&& Line : utils::SplitString(UPropertyOutput, '\n')) {
+        LOG_INFO("%s", Line.c_str());
     }
 
 
@@ -1433,8 +1433,8 @@ int DumpStructs()
         LOG_ERROR(_XOR_("Failed to dump UEnum rc %d"), rc);
         return rc < 0 ? rc : E_FAIL;
     }
-    for(auto line : utils::SplitString(UEnumOutput, '\n')) {
-        LOG_INFO("%s", line.c_str());
+    for(auto&& Line : utils::SplitString(UEnumOutput, '\n')) {
+        LOG_INFO("%s", Line.c_str());
     }
 
     return NOERROR;
@@ -1496,9 +1496,8 @@ int DumpNames()
     LOG_INFO(_XOR_("Found the FName::InitInternal_FindOrAddNameEntry signature: 0x%p"), Found);
 
     //LOG_INFO(_XOR_("FName::InitInternal_FindOrAddNameEntry instruction bytes = {"));
-    //std::string bufstr = utils::FormatBuffer(Found, 1024);
-    //for (auto line : utils::SplitString(bufstr, '\n')) {
-    //    LOG_INFO(_XOR_("%s"), line.c_str());
+    //for (auto&& Line : utils::SplitString(utils::FormatBuffer(Found, 2048), '\n')) {
+    //    LOG_INFO(_XOR_("%s"), Line.c_str());
     //}
     //LOG_INFO(_XOR_("};"));
 
@@ -1516,6 +1515,8 @@ int DumpNames()
         LOG_ERROR(_XOR_("Failed to disassemble FName::InitInternal_FindOrAddNameEntry!"));
         return rc;
     }
+
+
 
     // Heuristically search for offsets and inline decryption.
     Ip = const_cast<uint8_t *>(Found);
@@ -1774,61 +1775,55 @@ int DumpNames()
                     LOG_INFO(_XOR_("Found the TNameEntryArray::ElementsPerChunk value: %d"),
                              NamesEntryArrayElementsPerChunk);
 
-                    // Skip the next two instructions.
-                    INCREMENT_NEXT_INSTRUCTION();
-                    INCREMENT_NEXT_INSTRUCTION();
-
-                    // Make sure we can find the ChunksEncrypted decryption.
-                    // So check for the following sequence of instructions right after:
+                    // Skip instructions until we find the TNameEntryArray::ChunksEncrypted
+                    // register, offset, and inline decryption.
+                    // So look for the following sequence of instructions:
                     /* mov     rcx, [r13+0] */
                     /* cmp     qword ptr cs:aXenuinesdkCarv_93, 0 ; "XENUINESDK_CARVE" */
-                    /* jnz     short loc_7FF6FDBDFDDB */
-                    if (NextInst->opcode == I_MOV &&
-                        NextInst->ops[1].type == O_SMEM &&
-                        NextInst[1].opcode == I_CMP &&
-                        META_GET_FC(NextInst[2].meta) == FC_CND_BRANCH) {
-
-                        // We found the TNameEntryArray::ChunksEncrypted offset and decryption!
-                        NamesEntryArrayChunksEncryptedOffset = static_cast<size_t>(NextInst->disp);
-                        NamesEntryArrayChunksEncryptedRegister = NextInst->ops[0].index;
-
-                        // Skip the next two instructions.
+                    /* jnz     short loc_7FF6FDBDFDDB ; <--- Jump to decryption here */
+                    INCREMENT_NEXT_INSTRUCTION();
+                    while(!(NextInst->opcode == I_MOV &&
+                            NextInst->ops[1].type == O_SMEM)) {
                         INCREMENT_NEXT_INSTRUCTION();
-                        INCREMENT_NEXT_INSTRUCTION();
-
-                        // Skip instructions in between jump and decryption.
-                        TargetAddress = INSTRUCTION_GET_TARGET(NextInst);
-                        while (NextInst->addr != TargetAddress) {
-                            INCREMENT_NEXT_INSTRUCTION();
-                        }
-                        // We found the beginning of the TNameEntryArray::ChunksEncrypted
-                        // inline decryption!
-                        NamesEntryArrayChunksDecryptionBegin = NextIp;
-                        LOG_INFO(_XOR_("Found the TNameEntryArray::ChunksEncrypted decryption beginning: 0x%p"),
-                                 NamesEntryArrayChunksDecryptionBegin);
-
-                        // This should now mark the beginning of the TNameEntryArray::ChunksEncrypted
-                        // decryption. Keep iterating next instruction until we hit the end of
-                        // the decryption.
-                        INCREMENT_NEXT_INSTRUCTION();
-                        // Search for the decryption terminating instruction:
-                        /* mov     rcx, [rbp+4Fh+ChunksDecrypted] */
-                        while (!(NextInst->opcode == I_MOV &&
-                                 NextInst->ops[1].type == O_SMEM)) {
-                            INCREMENT_NEXT_INSTRUCTION();
-                        }
-                        INCREMENT_NEXT_INSTRUCTION();
-                        // We found the end of the TNameEntryArray::ChunksEncrypted inline decryption!
-                        NamesEntryArrayChunksDecryptionEnd = NextIp;
-                        LOG_INFO(_XOR_("Found the TNameEntryArray::ChunksEncrypted decryption ending: 0x%p"),
-                                 NamesEntryArrayChunksDecryptionEnd);
-
-                        // We are done!
-                        break;
-
-                    } else {
-                        LOG_ERROR(_XOR_("TNameEntryArray::ChunksEncrypted heuristic failed!"));
                     }
+                    // We found the TNameEntryArray::ChunksEncrypted offset and decryption!
+                    NamesEntryArrayChunksEncryptedOffset = static_cast<size_t>(NextInst->disp);
+                    NamesEntryArrayChunksEncryptedRegister = NextInst->ops[0].index;
+
+                    // Skip instructions until we find the jump to the inline decryption.
+                    INCREMENT_NEXT_INSTRUCTION();
+                    while (META_GET_FC(NextInst->meta) != FC_CND_BRANCH) {
+                        INCREMENT_NEXT_INSTRUCTION();
+                    }
+                    // Skip instructions in between jump and decryption.
+                    TargetAddress = INSTRUCTION_GET_TARGET(NextInst);
+                    while (NextInst->addr != TargetAddress) {
+                        INCREMENT_NEXT_INSTRUCTION();
+                    }
+                    // We found the beginning of the TNameEntryArray::ChunksEncrypted
+                    // inline decryption!
+                    NamesEntryArrayChunksDecryptionBegin = NextIp;
+                    LOG_INFO(_XOR_("Found the TNameEntryArray::ChunksEncrypted decryption beginning: 0x%p"),
+                             NamesEntryArrayChunksDecryptionBegin);
+
+                    // This should now mark the beginning of the TNameEntryArray::ChunksEncrypted
+                    // decryption. Keep iterating next instruction until we hit the end of
+                    // the decryption.
+                    INCREMENT_NEXT_INSTRUCTION();
+                    // Search for the decryption terminating instruction:
+                    /* mov     rcx, [rbp+4Fh+ChunksDecrypted] */
+                    while (!(NextInst->opcode == I_MOV &&
+                             NextInst->ops[1].type == O_SMEM)) {
+                        INCREMENT_NEXT_INSTRUCTION();
+                    }
+                    INCREMENT_NEXT_INSTRUCTION();
+                    // We found the end of the TNameEntryArray::ChunksEncrypted inline decryption!
+                    NamesEntryArrayChunksDecryptionEnd = NextIp;
+                    LOG_INFO(_XOR_("Found the TNameEntryArray::ChunksEncrypted decryption ending: 0x%p"),
+                             NamesEntryArrayChunksDecryptionEnd);
+
+                    // We are done!
+                    break;
 
                 } else {
                     LOG_ERROR(_XOR_("TNameEntryArray::ElementsPerChunk heuristic failed!"));
@@ -1862,7 +1857,7 @@ int DumpNames()
         LOG_INFO(_XOR_("FNameEntry::IndexEncrypted decryption = {"));
         std::string BufferString = utils::FormatBuffer(NamesEntryIndexDecryptionBegin,
                                                        __MIN(static_cast<size_t>(NamesEntryIndexDecryptionEnd - NamesEntryIndexDecryptionBegin), 1024));
-        for (auto Line : utils::SplitString(BufferString, '\n')) {
+        for (auto&& Line : utils::SplitString(BufferString, '\n')) {
             LOG_INFO(Line.c_str());
         }
         LOG_INFO(_XOR_("}; "));
@@ -1877,7 +1872,7 @@ int DumpNames()
         LOG_INFO(_XOR_("NamesEncrypted decryption = {"));
         std::string BufferString = utils::FormatBuffer(NamesDecryptionBegin,
                                                        __MIN(static_cast<size_t>(NamesDecryptionEnd - NamesDecryptionBegin), 1024));
-        for (auto Line : utils::SplitString(BufferString, '\n')) {
+        for (auto&& Line : utils::SplitString(BufferString, '\n')) {
             LOG_INFO(Line.c_str());
         }
         LOG_INFO(_XOR_("}; "));
@@ -1896,7 +1891,7 @@ int DumpNames()
         LOG_INFO(_XOR_("TNameEntryArray::ChunksEncrypted decryption = {"));
         std::string BufferString = utils::FormatBuffer(NamesEntryArrayChunksDecryptionBegin,
                                                        __MIN(static_cast<size_t>(NamesEntryArrayChunksDecryptionEnd - NamesEntryArrayChunksDecryptionBegin), 1024));
-        for (auto Line : utils::SplitString(BufferString, '\n')) {
+        for (auto&& Line : utils::SplitString(BufferString, '\n')) {
             LOG_INFO(Line.c_str());
         }
         LOG_INFO(_XOR_("}; "));
@@ -2060,7 +2055,7 @@ int DumpNames()
         LOG_INFO(_XOR_("TNameEntryArray::NumElementsEncrypted decryption = {"));
         std::string BufferString = utils::FormatBuffer(NamesEntryArrayNumElementsDecryptionBegin,
                                                        __MIN(static_cast<size_t>(NamesEntryArrayNumElementsDecryptionEnd - NamesEntryArrayNumElementsDecryptionBegin), 1024));
-        for (auto Line : utils::SplitString(BufferString, '\n')) {
+        for (auto&& Line : utils::SplitString(BufferString, '\n')) {
             LOG_INFO(Line.c_str());
         }
         LOG_INFO(_XOR_("}; "));
@@ -2081,6 +2076,17 @@ int8_t WorldEncryptedStackRegister = -1;
 uint8_t* WorldDecryptionBegin = nullptr;
 uint8_t* WorldDecryptionEnd = nullptr;
 
+size_t WorldPersistentLevelEncryptedOffset = -1;
+int8_t WorldPersistentLevelEncryptedRegister = -1;
+uint8_t* WorldPersistentLevelDecryptionBegin = nullptr;
+uint8_t* WorldPersistentLevelDecryptionEnd = nullptr;
+
+size_t LevelActorsEncryptedOffset = -1;
+int8_t LevelActorsEncryptedRegister = -1;
+uint8_t* LevelActorsDecryptionBegin = nullptr;
+uint8_t* LevelActorsDecryptionEnd = nullptr;
+
+
 int DumpWorld()
 {
     int rc = NOERROR;
@@ -2091,22 +2097,164 @@ int DumpWorld()
     void* ImageBase = utils::GetModuleHandleWIDE(nullptr /*0xC4D8736D TslGame.exe */);
     uint32_t ImageSize = utils::GetModuleSize((HMODULE)ImageBase);
 
-    // Search for the GWorld address inside the HandleCSVProfileCommand routine:
-    // .text:7FF6FC3954C7 48 8B D9                  mov     rbx, rcx
-    // .text:7FF6FC3954CA 48 8B 05 57 34 9C 04      mov     rax, cs:GWorld
-    // .text:7FF6FC3954D1 48 89 84 24 80 00 00 00   mov     [rsp+68h+arg_10], rax
-    // .text:7FF6FC3954D9 33 F6                     xor     esi, esi
-    // .text:7FF6FC3954DB 48 39 35 1E 7C 04 03      cmp     qword ptr cs:aXenuinesdkCarv_97, rsi ; "XENUINESDK_CARVE"
-    // .text:7FF6FC3954E2 75 10                     jnz     short loc_7FF6FC3954F4
-    // 48 8B D9 48 8B 05 ? ? ? ? 48 89 84 24 ? ? ? ? 33 F6
-    Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("48 8B D9 48 8B 05 ?? ?? ?? ?? 48 89 84 24"));
+    //// Search for the GWorld address inside the HandleCSVProfileCommand routine:
+    //// .text:7FF6FC3954C7 48 8B D9                  mov     rbx, rcx
+    //// .text:7FF6FC3954CA 48 8B 05 57 34 9C 04      mov     rax, cs:GWorld
+    //// .text:7FF6FC3954D1 48 89 84 24 80 00 00 00   mov     [rsp+68h+arg_10], rax
+    //// .text:7FF6FC3954D9 33 F6                     xor     esi, esi
+    //// .text:7FF6FC3954DB 48 39 35 1E 7C 04 03      cmp     qword ptr cs:aXenuinesdkCarv_97, rsi ; "XENUINESDK_CARVE"
+    //// .text:7FF6FC3954E2 75 10                     jnz     short loc_7FF6FC3954F4
+    //// 48 8B D9 48 8B 05 ? ? ? ? 48 89 84 24 ? ? ? ? 33 F6
+    //Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("48 8B D9 48 8B 05 ?? ?? ?? ?? 48 89 84 24"));
+    //if (!Found) {
+    //    LOG_ERROR(_XOR_("Failed to find GWorld decryption signature!"));
+    //    return ERROR_NOT_FOUND;
+    //}
+    //LOG_INFO(_XOR_("Found GWorld signature at 0x%p"), Found);
+    //
+    //// Disassemble the code at the found GWorld signature.
+    //rc = DisDecompose(Found,
+    //                  MAX_DISASM_LENGTH,
+    //                  (uint64_t)Found,
+    //                  Insts,
+    //                  MaxInstCount,
+    //                  &InstCount,
+    //                  NULL,
+    //                  DISASM_X64
+    //                  );
+    //if (rc != DIS_SUCCESS) {
+    //    LOG_ERROR(_XOR_("Failed to disassemble code at GWorld signature!"));
+    //    return rc;
+    //}
+    //
+    //// Heuristically search for the GWorld inline decryption.
+    //Ip = const_cast<uint8_t *>(Found);
+    //TargetAddress = 0;
+    //Offset = 0;
+    //InstIndex = 0;
+    //Inst = Insts;
+    //InstEnd = Insts + InstCount;
+    //while (Inst < InstEnd) {
+    //    NextInst = Inst + 1;
+    //    NextIp = Ip + Inst->size;
+    //    NextOffset = Offset + Inst->size;
+    //
+    //    // Find the the GWorld register mov instruction which leads to the inline decryption.
+    //    // Search for the GWorld mov instruction:
+    //    /* mov     rax, cs:GWorld */
+    //    /* mov     [rsp+80h], rax  */
+    //    /* xor     esi, esi  */
+    //    if (InstIndex == 1 &&
+    //        Inst->opcode == I_MOV &&
+    //        Inst->ops[1].type == O_SMEM &&
+    //        NextInst->opcode == I_MOV &&
+    //        NextInst->ops[0].type == O_SMEM &&
+    //        Inst->ops[0].index == NextInst->ops[1].index) {
+    //
+    //        // We found the GWorld offset and register!
+    //        WorldEncryptedOffset = static_cast<size_t>(Inst->disp);
+    //        WorldEncryptedRegister = Inst->ops[0].index;
+    //        WorldEncryptedStackOffset = static_cast<size_t>(NextInst->disp);
+    //        WorldEncryptedStackRegister = NextInst->ops[0].index;
+    //
+    //        // Search for the beginning of the GWorldEncrypted inline decryption:
+    //        INCREMENT_NEXT_INSTRUCTION();
+    //        while(META_GET_FC(NextInst->meta) != FC_CND_BRANCH) {
+    //            INCREMENT_NEXT_INSTRUCTION();
+    //        }
+    //        TargetAddress = INSTRUCTION_GET_TARGET(NextInst);
+    //        // Skip the instructions in between jump and decryption.
+    //        INCREMENT_NEXT_INSTRUCTION();
+    //        while (NextInst->addr != TargetAddress) {
+    //            INCREMENT_NEXT_INSTRUCTION();
+    //        }
+    //
+    //        // We found the beginning of the GWorldEncrypted inline decryption!
+    //        WorldDecryptionBegin = reinterpret_cast<uint8_t*>(TargetAddress);
+    //        LOG_INFO(_XOR_("Found the GWorldEncrypted decryption beginning: 0x%p"),
+    //                 WorldDecryptionBegin);
+    //
+    //        // Keep iterating next instruction until we hit the end of the decryption.
+    //        INCREMENT_NEXT_INSTRUCTION();
+    //        // Search for the decryption terminating instruction:
+    //        /* mov     rax, [rsp+68h+Decrypted] */
+    //        while (!(NextInst->opcode == I_MOV &&
+    //                 NextInst->ops[1].type == O_SMEM &&
+    //                 NextInst->ops[1].size == sizeof(uint64_t))) {
+    //            INCREMENT_NEXT_INSTRUCTION();
+    //        }
+    //        //LOG_INFO(_XOR_("NextInst->ops[1].size: %d  NextInst->dispSize: %d"),
+    //        //         NextInst->ops[1].size, NextInst->dispSize);
+    //        INCREMENT_NEXT_INSTRUCTION();
+    //        // We found the end of the GWorldEncrypted inline decryption!
+    //        WorldDecryptionEnd = NextIp;
+    //        LOG_INFO(_XOR_("Found the GWorldEncrypted decryption ending: 0x%p"),
+    //                 WorldDecryptionEnd);
+    //
+    //        // We are done!
+    //        break;
+    //    }
+    //
+    //    // Increment to the next instruction.
+    //    Inst = NextInst;
+    //    Ip = NextIp;
+    //    Offset = NextOffset;
+    //    InstIndex = static_cast<uint32_t>(NextInst - Insts);
+    //}
+    //
+    //// Output the heauristic search results.
+    //if (WorldEncryptedOffset != -1) {
+    //    LOG_INFO(_XOR_("GWorld offset = 0x%08x"), WorldEncryptedOffset);
+    //    LOG_INFO(_XOR_("GWorld register = %s"), RegisterStrings[WorldEncryptedRegister]);
+    //    LOG_INFO(_XOR_("GWorld stack offset = 0x%08x"), WorldEncryptedStackOffset);
+    //    LOG_INFO(_XOR_("GWorld stack register = %s"), RegisterStrings[WorldEncryptedStackRegister]);
+    //    LOG_INFO(_XOR_("GWorld decryption = {"));
+    //    std::string BufferString = utils::FormatBuffer(WorldDecryptionBegin,
+    //                                                   __MIN(static_cast<size_t>(WorldDecryptionEnd - WorldDecryptionBegin), 1024));
+    //    for (auto&& Line : utils::SplitString(BufferString, '\n')) {
+    //        LOG_INFO(Line.c_str());
+    //    }
+    //    LOG_INFO(_XOR_("}; "));
+    //}
+
+    // Search for the UWorld::Serialize routine:
+    // .text:7FF6BF348010                       UWorld__Serialize proc near
+    // .text:7FF6BF348010                       .....
+    // .text:7FF6BF3480E1                       loc_7FF6BF3480E1:           ; CODE XREF: UWorld__Serialize+9B^j
+    // .text:7FF6BF3480E1 48 89 86 F0 09 00 00  mov     [rsi+9F0h], rax
+    // .text:7FF6BF3480E8 4C 39 35 11 76 A0 02  cmp     qword ptr cs:aXenuinesdkCarv_1, r14 ; "XENUINESDK_CARVE"
+    // .text:7FF6BF3480EF 75 0E                 jnz     short loc_7FF6BF3480FF
+    // .text:7FF6BF3480F1 48 8B D0              mov     rdx, rax            ; _QWORD
+    // .text:7FF6BF3480F4 B9 84 C2 3E 48        mov     ecx, 483EC284h      ; _QWORD
+    // .text:7FF6BF3480F9 FF 15 29 76 A0 02     call    cs:XenuineDecrypt_1
+    // .text:7FF6BF3480FF                       loc_7FF6BF3480FF:           ; CODE XREF: UWorld__Serialize+DF^j
+    // .text:7FF6BF3480FF 8B 47 40              mov     eax, [rdi+40h]      ; <---- Byte pattern signature here.
+    // .text:7FF6BF348102 3D C0 01 00 00        cmp     eax, 1C0h           ; <---- Byte pattern signature here.
+    // .text:7FF6BF348107 7D 5A                 jge     short loc_7FF6BF348163
+    // .text:7FF6BF348109 BB 04 00 00 00        mov     ebx, 4
+    // .text:7FF6BF34810E 66 90                 xchg    ax, ax
+    // 8B 47 ? 3D C0 01 00 00
+    Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("8B 47 ?? 3D C0 01 00 00"));
     if (!Found) {
-        LOG_ERROR(_XOR_("Failed to find GWorld decryption signature!"));
+        LOG_ERROR(_XOR_("Failed to find UWorld::Serialize signature!"));
         return ERROR_NOT_FOUND;
     }
-    LOG_INFO(_XOR_("Found GWorld signature at 0x%p"), Found);
+    LOG_INFO(_XOR_("Found UWorld::Serialize signature at 0x%p"), Found);
+    rc = utils::FindFunctionStartFromPtr(Found, 1024, &Found);
+    if (rc < 0) {
+        LOG_ERROR(_XOR_("Failed to backtrack to beginning of UWorld::Serialize!"));
+        return rc;
+    }
+    LOG_INFO(_XOR_("Found UWorld::Serialize function address at 0x%p"), Found);
 
-    // Disassemble the code at the found GWorld signature.
+    //LOG_INFO(_XOR_("UWorld::Serialize code = {"));
+    //std::string UWorldSerializeString = utils::FormatBuffer(Found, 256);
+    //for (auto&& Line : utils::SplitString(UWorldSerializeString, '\n')) {
+    //    LOG_INFO("%s", Line.c_str());
+    //}
+    //LOG_INFO(_XOR_("};"));
+
+    // Disassemble the code at the found UWorld::Serialize address.
     rc = DisDecompose(Found,
                       MAX_DISASM_LENGTH,
                       (uint64_t)Found,
@@ -2121,7 +2269,7 @@ int DumpWorld()
         return rc;
     }
 
-    // Heuristically search for the GWorld inline decryption.
+    // Heuristically search for the UWorld::PersistentLevel inline decryption.
     Ip = const_cast<uint8_t *>(Found);
     TargetAddress = 0;
     Offset = 0;
@@ -2133,26 +2281,17 @@ int DumpWorld()
         NextIp = Ip + Inst->size;
         NextOffset = Offset + Inst->size;
 
-        // Find the the GWorld register mov instruction which leads to the inline decryption.
-        // Search for the GWorld mov instruction:
-        /* mov     rax, cs:GWorld */
-        /* mov     [rsp+80h], rax  */
-        /* xor     esi, esi  */
-        if (InstIndex == 1 &&
-            Inst->opcode == I_MOV &&
-            Inst->ops[1].type == O_SMEM &&
-            NextInst->opcode == I_MOV &&
-            NextInst->ops[0].type == O_SMEM &&
-            Inst->ops[0].index == NextInst->ops[1].index) {
+        // Search for the instruction that gets the UWorld::PersistentLevelEncrypted value.
+        /* mov     rcx, [rsi+9F0h]  ; RCX = this->PersistentLevelEncrypted */
+        if (Inst->opcode == I_MOV &&
+            Inst->ops[1].type == O_SMEM) {
 
-            // We found the GWorld offset and register!
-            WorldEncryptedOffset = static_cast<size_t>(Inst->disp);
-            WorldEncryptedRegister = Inst->ops[0].index;
-            WorldEncryptedStackOffset = static_cast<size_t>(NextInst->disp);
-            WorldEncryptedStackRegister = NextInst->ops[0].index;
+            // Found the UWorld::PersistentLevelEncrypted field offset and register!
+            WorldPersistentLevelEncryptedOffset = static_cast<size_t>(Inst->disp);
+            WorldPersistentLevelEncryptedRegister = Inst->ops[0].index;
 
-            // Search for the beginning of the GWorldEncrypted inline decryption:
-            INCREMENT_NEXT_INSTRUCTION();
+            // The next conditional jump should jump to the beginning of the
+            // UWorld::PersistentLevelEncrypted field inline decryption.
             while(META_GET_FC(NextInst->meta) != FC_CND_BRANCH) {
                 INCREMENT_NEXT_INSTRUCTION();
             }
@@ -2163,27 +2302,25 @@ int DumpWorld()
                 INCREMENT_NEXT_INSTRUCTION();
             }
 
-            // We found the beginning of the GWorldEncrypted inline decryption!
-            WorldDecryptionBegin = reinterpret_cast<uint8_t*>(TargetAddress);
-            LOG_INFO(_XOR_("Found the GWorldEncrypted decryption beginning: 0x%p"),
-                     WorldDecryptionBegin);
+            // We found the beginning of the UWorld::PersistentLevelEncrypted inline decryption!
+            WorldPersistentLevelDecryptionBegin = reinterpret_cast<uint8_t*>(TargetAddress);
+            LOG_INFO(_XOR_("Found the UWorld::PersistentLevelEncrypted decryption beginning: 0x%p"),
+                     WorldPersistentLevelDecryptionBegin);
 
             // Keep iterating next instruction until we hit the end of the decryption.
             INCREMENT_NEXT_INSTRUCTION();
             // Search for the decryption terminating instruction:
-            /* mov     rax, [rsp+68h+Decrypted] */
+            /* mov     rax, [rsp+58h+Decrypted] */
             while (!(NextInst->opcode == I_MOV &&
                      NextInst->ops[1].type == O_SMEM &&
                      NextInst->ops[1].size == sizeof(uint64_t))) {
                 INCREMENT_NEXT_INSTRUCTION();
             }
-            //LOG_INFO(_XOR_("NextInst->ops[1].size: %d  NextInst->dispSize: %d"),
-            //         NextInst->ops[1].size, NextInst->dispSize);
             INCREMENT_NEXT_INSTRUCTION();
-            // We found the end of the GWorldEncrypted encryption!
-            WorldDecryptionEnd = NextIp;
-            LOG_INFO(_XOR_("Found the GWorldEncrypted decryption ending: 0x%p"),
-                     WorldDecryptionEnd);
+            // We found the end of the UWorld::PersistentLevelEncrypted inline decryption!
+            WorldPersistentLevelDecryptionEnd = NextIp;
+            LOG_INFO(_XOR_("Found the UWorld::PersistentLevelEncrypted decryption ending: 0x%p"),
+                     WorldPersistentLevelDecryptionEnd);
 
             // We are done!
             break;
@@ -2197,26 +2334,141 @@ int DumpWorld()
     }
 
     // Output the heauristic search results.
-    if (WorldEncryptedOffset != -1) {
-        LOG_INFO(_XOR_("GWorld offset = 0x%08x"), WorldEncryptedOffset);
-        LOG_INFO(_XOR_("GWorld register = %s"), RegisterStrings[WorldEncryptedRegister]);
-        LOG_INFO(_XOR_("GWorld stack offset = 0x%08x"), WorldEncryptedStackOffset);
-        LOG_INFO(_XOR_("GWorld stack register = %s"), RegisterStrings[WorldEncryptedStackRegister]);
-        LOG_INFO(_XOR_("GWorld decryption = {"));
-        std::string BufferString = utils::FormatBuffer(WorldDecryptionBegin,
-                                                       __MIN(static_cast<size_t>(WorldDecryptionEnd - WorldDecryptionBegin), 1024));
-        for (auto Line : utils::SplitString(BufferString, '\n')) {
+    if (WorldPersistentLevelEncryptedOffset != -1) {
+        LOG_INFO(_XOR_("UWorld::PersistentLevelEncrypted offset = 0x%08x"), WorldPersistentLevelEncryptedOffset);
+        LOG_INFO(_XOR_("UWorld::PersistentLevelEncrypted register = %s"), RegisterStrings[WorldPersistentLevelEncryptedRegister]);
+        LOG_INFO(_XOR_("UWorld::PersistentLevelEncrypted decryption = {"));
+        std::string BufferString = utils::FormatBuffer(WorldPersistentLevelDecryptionBegin,
+                                                       __MIN(static_cast<size_t>(WorldPersistentLevelDecryptionEnd - WorldPersistentLevelDecryptionBegin), 1024));
+        for (auto&& Line : utils::SplitString(BufferString, '\n')) {
             LOG_INFO(Line.c_str());
         }
         LOG_INFO(_XOR_("}; "));
     }
 
+
+    // Search for the ULevel::IncrementalUpdateComponents call inside of UWorld::AddToWorld:
+    // .text:7FF6BF335670                           loc_7FF6BF335670:               ; CODE XREF: UWorld__AddToWorld+322^j
+    // .text:7FF6BF335670 41 8B D5                  mov     edx, r13d               ; NumComponentsToUpdate
+    // .text:7FF6BF335673                           loc_7FF6BF335673:               ; CODE XREF: UWorld__AddToWorld+32E^j
+    // .text:7FF6BF335673 45 33 C0                  xor     r8d, r8d                ; bRerunConstructionScripts
+    // .text:7FF6BF335676 48 8B CE                  mov     rcx, rsi                ; this
+    // .text:7FF6BF335679 E8 02 03 06 FF            call    ULevel__IncrementalUpdateComponents <---- Call instruction right here
+    // .text:7FF6BF33567E 41 0F B6 07               movzx   eax, byte ptr [r15]
+    // .text:7FF6BF335682 A8 01                     test    al, 1
+    // .text:7FF6BF335684 75 2A                     jnz     short loc_7FF6BF3356B0
+    // .text:7FF6BF335686 40 84 FF                  test    dil, dil
+    // .text:7FF6BF335689 74 CD                     jz      short loc_7FF6BF335658
+    // .text:7FF6BF33568B F3 0F 10 1D 15 96 BB 03   movss   xmm3, cs:GLevelStreamingActorsUpdateTimeLimit
+    // .text:7FF6BF335693 0F 5A DB                  cvtps2pd xmm3, xmm3             ; TimeLimit
+    // .text:7FF6BF335696 4C 8B C6                  mov     r8, rsi                 ; Level
+    // .text:7FF6BF335699 0F 28 CE                  movaps  xmm1, xmm6              ; StartTime
+    // .text:7FF6BF33569C 48 8D 0D 0D 99 A1 02      lea     rcx, aUpdatingCompon    ; "updating components"
+    // .text:7FF6BF3356A3 E8 E8 B3 00 00            call    IsTimeLimitExceeded
+    // E8 ? ? ? ? 41 0F B6 07 A8 01
+    Found = utils::FindPatternIDA(ImageBase, ImageSize, _XOR_("E8 ?? ?? ?? ?? 41 0F B6 07 A8 01"));
+    if (Found)
+        Found = static_cast<const uint8_t*>(utils::GetCallTargetAddress(Found));
+    if (!Found) {
+        LOG_ERROR(_XOR_("Failed to find ULevel::IncrementalUpdateComponents address!"));
+        return ERROR_NOT_FOUND;
+    }
+
+    // Disassemble the code at the found ULevel::IncrementalUpdateComponents address.
+    rc = DisDecompose(Found,
+                      MAX_DISASM_LENGTH,
+                      (uint64_t)Found,
+                      Insts,
+                      MaxInstCount,
+                      &InstCount,
+                      NULL,
+                      DISASM_X64
+                      );
+    if (rc != DIS_SUCCESS) {
+        LOG_ERROR(_XOR_("Failed to disassemble code at ULevel::IncrementalUpdateComponents!"));
+        return rc;
+    }
+
+    // Heuristically search for the ULevel::Actors offset and inline decryption.
+    Ip = const_cast<uint8_t *>(Found);
+    TargetAddress = 0;
+    Offset = 0;
+    InstIndex = 0;
+    Inst = Insts;
+    InstEnd = Insts + InstCount;
+    while (Inst < InstEnd) {
+        NextInst = Inst + 1;
+        NextIp = Ip + Inst->size;
+        NextOffset = Offset + Inst->size;
+
+        // Search for the instruction that gets the ULevel::ActorsEncrypted value.
+        /* mov     rcx, [rdi+1C8h]  ; RCX = thisptr->ActorsEncrypted */
+        if (Inst->opcode == I_MOV &&
+            Inst->ops[1].type == O_SMEM &&
+            Inst->ops[1].size == sizeof(uint64_t)) {
+
+            // Found the ULevel::ActorsEncrypted field offset and register!
+            LevelActorsEncryptedOffset = static_cast<size_t>(Inst->disp);
+            LevelActorsEncryptedRegister = Inst->ops[0].index;
+
+            // The next conditional jump should jump to the beginning of the
+            // ULevel::ActorsEncrypted field inline decryption.
+            while (META_GET_FC(NextInst->meta) != FC_CND_BRANCH) {
+                INCREMENT_NEXT_INSTRUCTION();
+            }
+            TargetAddress = INSTRUCTION_GET_TARGET(NextInst);
+            // Skip the instructions in between jump and decryption.
+            INCREMENT_NEXT_INSTRUCTION();
+            while (NextInst->addr != TargetAddress) {
+                INCREMENT_NEXT_INSTRUCTION();
+            }
+
+            // We found the beginning of the ULevel::ActorsEncrypted inline decryption!
+            LevelActorsDecryptionBegin = reinterpret_cast<uint8_t*>(TargetAddress);
+            LOG_INFO(_XOR_("Found the ULevel::ActorsEncrypted decryption beginning: 0x%p"),
+                     LevelActorsDecryptionBegin);
+
+            // Keep iterating next instruction until we hit the end of the decryption.
+            INCREMENT_NEXT_INSTRUCTION();
+            // Search for the decryption terminating instruction:
+            /* mov     rax, [rsp+48h+Decrypted] */
+            while (!(NextInst->opcode == I_MOV &&
+                     NextInst->ops[1].type == O_SMEM &&
+                     NextInst->ops[1].size == sizeof(uint64_t))) {
+                INCREMENT_NEXT_INSTRUCTION();
+            }
+            INCREMENT_NEXT_INSTRUCTION();
+            // We found the end of the ULevel::ActorsEncrypted inline decryption!
+            LevelActorsDecryptionEnd = NextIp;
+            LOG_INFO(_XOR_("Found the ULevel::ActorsEncrypted decryption ending: 0x%p"),
+                     LevelActorsDecryptionEnd);
+
+            // We are done!
+            break;
+        }
+
+        // Increment to the next instruction.
+        Inst = NextInst;
+        Ip = NextIp;
+        Offset = NextOffset;
+        InstIndex = static_cast<uint32_t>(NextInst - Insts);
+    }
+
+    // Output the heauristic search results.
+    if (LevelActorsEncryptedOffset != -1) {
+        LOG_INFO(_XOR_("ULevel::ActorsEncrypted offset = 0x%08x"), LevelActorsEncryptedOffset);
+        LOG_INFO(_XOR_("ULevel::ActorsEncrypted register = %s"), RegisterStrings[LevelActorsEncryptedRegister]);
+        LOG_INFO(_XOR_("ULevel::ActorsEncrypted decryption = {"));
+        std::string BufferString = utils::FormatBuffer(LevelActorsDecryptionBegin,
+                                                       __MIN(static_cast<size_t>(LevelActorsDecryptionEnd - LevelActorsDecryptionBegin), 1024));
+        for (auto&& Line : utils::SplitString(BufferString, '\n')) {
+            LOG_INFO(Line.c_str());
+        }
+        LOG_INFO(_XOR_("}; "));
+    }
+
+
     return rc;
 }
-
-
-
-
-
 
 }

@@ -76,6 +76,39 @@
 
 namespace utils {
 
+inline bool is_valid_ptr(const void* ptr)
+{
+    constexpr uint64_t max = 0x7FFFFFEFFFF;
+    constexpr uint64_t min = 0x100000;
+    if (uint64_t(ptr) > max || uint64_t(ptr) < min || uint64_t(ptr) % 4)
+        return false;
+    return true;
+}
+
+
+/**
+ * Searches through a supplied class instance's vtable for a matching function.
+ *
+ * @param[in] Instance   The instance of the class to search vtable of.
+ * @param[in] SearchSize The size to search in each vtable entry.
+ * @param[in] Pattern    The pattern to search.
+ * @return  The index of the matching vtable method. -1 if not found.
+ */
+size_t
+UTLAPI
+FindVFunctionIndex(
+    IN const void *Instance,
+    IN size_t SearchSize,
+    IN std::string Pattern
+    );
+
+template<typename TFn> inline TFn GetVFunction(const void *instance, size_t index)
+{
+    const void** VTable = *reinterpret_cast<const void***>(const_cast<void*>(instance));
+    return reinterpret_cast<TFn>(VTable[index]);
+}
+
+
 /**
  * Calculates a relative offset to the target from the supplied instruction.
  *
@@ -650,7 +683,7 @@ GetModuleFileNameCRC32(
 ULONG
 UTLAPI
 GetModuleSize(
-    IN HMODULE hModule
+    IN void* ModuleBase
     );
 
 
@@ -786,10 +819,7 @@ template<typename T> inline void write_value(void *buffer, T value) {
     *reinterpret_cast<T *>(buffer) = value;
 }
 
-template<typename TFn> inline TFn GetVFunction(const void *instance, std::size_t index)
-{
-    const void** VTable = *reinterpret_cast<const void***>(const_cast<void*>(instance));
-    return reinterpret_cast<TFn>(VTable[index]);
-}
+
+
 
 } // utils

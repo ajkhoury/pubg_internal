@@ -10,16 +10,18 @@ DecryptObjectsAsm PROC
         sub     rsp, 8
         mov     rbp, rsp
 
-        mov     QWORD PTR [rbp], 0
-        mov     eax,ecx
-        xor     eax,067de73ebh
-        sub     eax,035759deah
-        xor     eax,0d05411fdh
-        mov     DWORD PTR [rbp],eax
+        mov     eax,ecx                 ; RCX = ObjectsEncrypted
         shr     rcx,32
-        xor     ecx,0b45da658h
-        sub     ecx,36aa362ah
-        xor     ecx,51f79072h
+        xor     eax,0c95d03bdh
+        xor     ecx,02e8cc6e8h
+        rol     ecx,8
+        add     eax,064e4545ch
+        add     ecx,063db63dch
+        xor     eax,0b957e1h
+        xor     ecx,0c98cc6e8h
+        mov     DWORD PTR [rbp],eax
+        rol     ecx,8
+        xor     ecx,09c249c24h
         mov     DWORD PTR [rbp+4],ecx
         mov     rax,QWORD PTR [rbp]
 
@@ -41,14 +43,13 @@ DecryptObjectIndexAsm PROC
         sub     rsp, 8
         mov     rbp, rsp
 
-        mov     ebx, ecx
-        xor     ebx,01a02e929h
-        ror     ebx,14
-        mov     esi,ebx
-        shl     esi,16
-        xor     esi,ebx
-        xor     esi,0a825ef1eh
-        mov     eax,esi
+        mov     ebx, ecx            ; EBX = InternalIndexEncrypted
+        mov     edi,ebx
+        shl     edi,16
+        xor     r12d,r12d
+        xor     edi,01092215dh
+        xor     edi,ebx
+        mov     eax,edi
 
         add     rsp, 8
         pop     rbp
@@ -69,8 +70,8 @@ DecryptObjectFlagsAsm PROC
         mov     rbp, rsp
 
         mov     ebx, ecx                ; EBX = ObjectFlagsEncrypted
-        xor     ebx,0827741e1h
-        rol     ebx,3
+        xor     ebx,04c6d20beh
+        ror     ebx,0fh
         not     ebx
         mov     eax, ebx
 
@@ -93,10 +94,10 @@ DecryptObjectOuterAsm PROC
 ;       mov     rbp, rsp
 
         mov     rbx, rcx                ; RBX = OuterEncrypted
-        mov     rsi,0b8213cea5665c11bh
-        mov     rbp,035bc2b9281e9ae11h
+        mov     rsi,017c5d6ba13b06525h
+        mov     rbp,09cf3dd6d41702e7eh
         xor     rbx,rsi
-        rol     rbx,6
+        ror     rbx,0ch
         mov     rax,rbx
         shl     rax,32
         xor     rax,rbp
@@ -121,12 +122,12 @@ DecryptObjectClassAsm PROC
 ;       mov     rbp, rsp
 
         mov     rdi, rcx                ; RDI = ClassEncrypted
-        mov     rax,0a73bef1e35b16a80h
+        mov     rax,01a511c71fcf834ebh
         xor     rdi,rax
-        ror     rdi,14h
+        rol     rdi,1eh
         mov     rbx,rdi
         shl     rbx,32
-        mov     rax,036afb043acad5969h
+        mov     rax,0c5a53184ee3b0cafh
         xor     rbx,rax
         xor     rbx,rdi
         mov     rax, rbx
@@ -155,22 +156,21 @@ DecryptObjectFNameAsm PROC
         mov     ebx, ecx                ; EBX = IndexEncrypted
         mov     edi, edx                ; EDI = NumberEncrypted
 
-        ; Index decryption.
-        xor     ebx,041e18277h
-        ror     ebx,13
-        mov     eax,ebx
-        shl     eax,16
-        xor     eax,ebx
-        xor     eax,0d08566cfh
-        mov     DWORD PTR [r8],eax
-        ; Number decryption
-        xor     edi,048e0de23h
-        ror     edi,5
-        mov     eax,edi
-        shl     eax,16
-        xor     eax,edi
-        xor     eax,085d0dc4ch
-        mov     DWORD PTR [r9],eax
+        xor    ebx,020be4c6dh
+        rol    ebx,1
+        mov    eax,ebx
+        shl    eax,16
+        xor    eax,ebx
+        xor    eax,0ee1586e3h
+        mov    DWORD PTR [r8],eax
+
+        xor    edi,04a359959h
+        rol    edi,9
+        mov    eax,edi
+        shl    eax,16
+        xor    eax,edi
+        xor    eax,015eeb119h
+        mov    DWORD PTR [r9],eax
 
         add     rsp, 8
         pop     rbp

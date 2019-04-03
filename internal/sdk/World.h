@@ -15,7 +15,11 @@ public:
     class UWorld const& GetConstRef() const { return *GetConstPtr(); }
     class UWorld& GetRef() const { return *GetPtr(); }
 
-    class ULevel* GetCurrentLevel();
+#if defined(ENABLE_SDK)
+    TArray<class ULevel*> GetLevels() const;
+    class ULevel* GetPersistentLevel() const;
+    class ULevel* GetCurrentLevel() const;
+#endif // ENABLE_SDK
 
 private:
     uint64_t *WorldEncryptedPtr;
@@ -37,8 +41,6 @@ public:
 
     class ULevel const& GetConstRef() const { return *GetConstPtr(); }
     class ULevel& GetRef() const { return *GetPtr(); }
-
-
 
 private:
     class ULevel* Level;
